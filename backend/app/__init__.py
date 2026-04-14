@@ -88,4 +88,9 @@ def create_app(config_class=None):
         db.session.rollback()
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
+
+    # ── Criar tabelas se não existirem ────────
+    with app.app_context():
+        db.create_all()
+
     return app
