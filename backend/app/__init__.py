@@ -11,14 +11,13 @@ from app.models import db
 migrate = Migrate()
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["200 per day", "500 per hour"],
-    storage_uri="memory://",   # em produção substitua por redis://...
-    #storage_uri=REDIS_URL,  # ← Mesmo código, URI diferente!
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
 )
 
 
 def create_app(config_class=None):
-    app = Flask(__name__)
+    app = Flask(__name__, instance_path='/tmp')
 
     # ── Configuração ──────────────────────────
     if config_class is None:
@@ -66,14 +65,6 @@ def create_app(config_class=None):
             'message': 'Task Manager API',
             'version': '2.0.0',
             'status':  'running',
-            'docs':    {
-                'auth':          '/auth/register | /auth/login | /auth/refresh | /auth/logout | /auth/me',
-                'tasks':         '/tasks (GET paginado, POST) | /tasks/<id> (GET, PUT, DELETE)',
-                'collaborators': '/tasks/<id>/collaborators (POST, DELETE)',
-                'stats':         '/tasks/stats',
-                'categories':    '/categories (GET, POST) | /categories/<id> (PUT, DELETE)',
-                'notifications': '/notifications (GET) | /notifications/<id>/read | /notifications/read-all',
-            },
         })
 
     # ── Error handlers ────────────────────────
