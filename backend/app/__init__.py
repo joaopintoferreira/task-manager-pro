@@ -54,10 +54,10 @@ def create_app(config_class=None):
     )
 
     # ── Blueprints ────────────────────────────
-    from app.auth import auth_bp
-    from app.routes.tasks import tasks_bp
-    from app.routes.categories import categories_bp
-    from app.routes.notifications import notifications_bp
+    from backend.app.auth import auth_bp
+    from backend.app.routes.tasks import tasks_bp
+    from backend.app.routes.categories import categories_bp
+    from backend.app.routes.notifications import notifications_bp
 
     app.register_blueprint(auth_bp,          url_prefix='/auth')
     app.register_blueprint(tasks_bp,         url_prefix='/tasks')
