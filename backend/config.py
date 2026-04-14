@@ -31,9 +31,22 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    
+    # Corrige prefixo antigo do Heroku/Supabase
+    _db_url = os.getenv('DATABASE_URL', '')
+    if _db_url.startswith('postgres://'):
+        _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+    
+    # Adiciona sslmode se não tiver
+    if _db_url and 'sslmode' not in _db_url:
+        _db_url += '?sslmode=require'
+    
+    SQLALCHEMY_DATABASE_URI = _db_url
+    
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size':    int(os.getenv('DB_POOL_SIZE', 10)),
         'max_overflow': int(os.getenv('DB_MAX_OVERFLOW', 20)),
         'pool_recycle': 3600,
         'pool_pre_ping': True,
+        'connect_args': {'sslmode': 'require'},  # força SSL no driver também
     }
