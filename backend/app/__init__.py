@@ -21,8 +21,11 @@ def create_app(config_class=None):
 
     # ── Configuração ──────────────────────────
     if config_class is None:
-        env = os.getenv('FLASK_ENV', 'development')
-        config_class = DevelopmentConfig if env == 'development' else ProductionConfig
+        db_url = os.environ.get('DATABASE_URL', '')
+        if db_url.startswith('postgresql'):
+            config_class = ProductionConfig
+        else:
+            config_class = DevelopmentConfig
 
     app.config.from_object(config_class)
 
