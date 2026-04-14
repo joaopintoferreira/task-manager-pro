@@ -11,6 +11,7 @@
     }
   ],
   "routes": [
+    { "src": "/debug-env",          "dest": "backend/wsgi.py" },
     { "src": "/auth/(.*)",          "dest": "backend/wsgi.py" },
     { "src": "/tasks/(.*)",         "dest": "backend/wsgi.py" },
     { "src": "/categories/(.*)",    "dest": "backend/wsgi.py" },
