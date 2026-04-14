@@ -5,7 +5,8 @@ from datetime import timedelta
 load_dotenv()
 
 class Config:
-    SECRET_KEY = os.getenv('SECRET_KEY')
+    #SECRET_KEY = os.getenv('SECRET_KEY')
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
     if not SECRET_KEY:
         raise ValueError("SECRET_KEY não definida nas variáveis de ambiente!")
 

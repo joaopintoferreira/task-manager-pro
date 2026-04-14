@@ -22,7 +22,8 @@ def create_app(config_class=None):
     # ── Configuração ──────────────────────────
     if config_class is None:
         db_url = os.environ.get('DATABASE_URL', '')
-        if db_url.startswith('postgresql'):
+        #if db_url.startswith('postgresql'):
+        if 'postgres' in db_url:
             config_class = ProductionConfig
         else:
             config_class = DevelopmentConfig
@@ -90,7 +91,7 @@ def create_app(config_class=None):
 
 
     # ── Criar tabelas se não existirem ────────
-    with app.app_context():
-        db.create_all()
+    #with app.app_context():
+       # db.create_all()
 
     return app
