@@ -1,0 +1,47 @@
+# ── Python ──────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtualenv ───────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Variáveis de ambiente (NUNCA commitar!) ──
+.env
+.env.local
+.env.production
+
+# ── Banco de dados local ─────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Flask migrations locais ──────────────────
+backend/migrations/versions/
+
+# ── IDEs ─────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ───────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────
+*.log
+logs/
+
+# ── Vercel ───────────────────────────────────
+.vercel/

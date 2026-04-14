@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend/wsgi.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/auth/(.*)",          "dest": "backend/wsgi.py" },
+    { "src": "/tasks/(.*)",         "dest": "backend/wsgi.py" },
+    { "src": "/categories/(.*)",    "dest": "backend/wsgi.py" },
+    { "src": "/notifications/(.*)", "dest": "backend/wsgi.py" },
+    { "src": "/",                   "dest": "backend/wsgi.py" },
+    { "src": "/(.*)",               "dest": "frontend/$1"     }
+  ]
+}

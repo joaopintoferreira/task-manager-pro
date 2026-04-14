@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-brand">
+            <i class="bi bi-check2-circle"></i>
+            <span>Task Manager</span>
+        </div>
+        <button class="sidebar-close d-md-none" onclick="toggleSidebar()">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+
+    <!-- User info -->
+    <div class="sidebar-user">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-info">
+            <div class="user-name"  id="user-name">Carregando...</div>
+            <div class="user-email" id="user-email"></div>
+        </div>
+    </div>
+
+    <!-- Stats rápidas -->
+    <div class="sidebar-stats">
+        <div class="stat-pill" id="stat-pending">
+            <i class="bi bi-hourglass-split"></i>
+            <span id="stat-pending-n">0</span> pendentes
+        </div>
+        <div class="stat-pill overdue" id="stat-overdue">
+            <i class="bi bi-exclamation-circle"></i>
+            <span id="stat-overdue-n">0</span> atrasadas
+        </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="sidebar-nav">
+        <div class="nav-section-label">Filtrar</div>
+        <a class="nav-link active" href="#" data-filter="all"       onclick="setFilter('all',this)">
+            <i class="bi bi-list-task"></i> Todas
+            <span class="nav-badge" id="cnt-all">0</span>
+        </a>
+        <a class="nav-link" href="#" data-filter="pending"     onclick="setFilter('pending',this)">
+            <i class="bi bi-circle"></i> Pendentes
+            <span class="nav-badge" id="cnt-pending">0</span>
+        </a>
+        <a class="nav-link" href="#" data-filter="in_progress" onclick="setFilter('in_progress',this)">
+            <i class="bi bi-arrow-repeat"></i> Em progresso
+            <span class="nav-badge" id="cnt-in_progress">0</span>
+        </a>
+        <a class="nav-link" href="#" data-filter="completed"   onclick="setFilter('completed',this)">
+            <i class="bi bi-check-circle"></i> Concluídas
+            <span class="nav-badge" id="cnt-completed">0</span>
+        </a>
+
+        <div class="nav-section-label mt-3">
+            Categorias
+            <button class="btn-icon ms-auto" onclick="openCategoryModal()" title="Nova categoria">
+                <i class="bi bi-plus"></i>
+            </button>
+        </div>
+        <div id="categories-nav">
+            <div class="text-muted small ps-2">Carregando...</div>
+        </div>
+    </nav>
+
+    <!-- Logout -->
+    <div class="sidebar-footer">
+        <button class="btn-logout" onclick="doLogout()">
+            <i class="bi bi-box-arrow-left"></i> Sair
+        </button>
+    </div>
+</aside>
+
+<!-- Overlay mobile -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<!-- ══════════════════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════════════════ -->
+<div class="main-content" id="main-content">
+
+    <!-- Topbar -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="btn-icon d-md-none me-2" onclick="toggleSidebar()">
+                <i class="bi bi-list" style="font-size:1.3rem;"></i>
+            </button>
+            <h1 class="page-title" id="page-title">Todas as Tarefas</h1>
+        </div>
+        <div class="topbar-right">
+            <!-- Notificações -->
+            <button class="btn-icon notif-btn" onclick="toggleNotifPanel()" title="Notificações">
+                <i class="bi bi-bell"></i>
+                <span class="notif-badge" id="notif-badge" style="display:none;"></span>
+            </button>
+            <!-- Nova tarefa -->
+            <button class="btn-primary-sm" onclick="openTaskModal()">
+                <i class="bi bi-plus-lg"></i> Nova tarefa
+            </button>
+        </div>
+    </header>
+
+    <!-- Painel de notificações -->
+    <div class="notif-panel" id="notif-panel" style="display:none;">
+        <div class="notif-header">
+            <span>Notificações</span>
+            <button class="btn-text" onclick="markAllRead()">Marcar tudo como lido</button>
+        </div>
+        <div id="notif-list" class="notif-list">
+            <div class="text-center text-muted py-3">Nenhuma notificação</div>
+        </div>
+    </div>
+
+    <!-- Barra de busca + filtros -->
+    <div class="filter-bar">
+        <div class="search-wrap">
+            <i class="bi bi-search search-icon"></i>
+            <input type="text" class="search-input" id="search-input" placeholder="Buscar tarefas..." oninput="onSearch(this.value)">
+        </div>
+        <div class="filter-group">
+            <select class="filter-select" id="filter-priority" onchange="onPriorityChange(this.value)">
+                <option value="">Prioridade</option>
+                <option value="high">🔴 Alta</option>
+                <option value="medium">🟡 Média</option>
+                <option value="low">🟢 Baixa</option>
+            </select>
+            <select class="filter-select" id="filter-category" onchange="onCategoryChange(this.value)">
+                <option value="">Categoria</option>
+            </select>
+            <select class="filter-select" id="sort-by" onchange="onSortChange(this.value)">
+                <option value="created_at">Mais recentes</option>
+                <option value="due_date">Prazo</option>
+                <option value="priority">Prioridade</option>
+                <option value="title">Título</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Lista de tarefas -->
+    <div class="tasks-area" id="tasks-area">
+        <div class="loading-state">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Carregando tarefas...</p>
+        </div>
+    </div>
+
+    <!-- Paginação -->
+    <div class="pagination-wrap" id="pagination-wrap" style="display:none;">
+        <button class="btn-page" id="btn-prev" onclick="changePage(-1)">
+            <i class="bi bi-chevron-left"></i> Anterior
+        </button>
+        <span class="page-info" id="page-info"></span>
+        <button class="btn-page" id="btn-next" onclick="changePage(1)">
+            Próxima <i class="bi bi-chevron-right"></i>
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL — TAREFA
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="taskModal" tabindex="-1" aria-labelledby="taskModalLabel">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="taskModalLabel">Nova Tarefa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="taskId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Título <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="taskTitle" placeholder="O que precisa ser feito?">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Descrição</label>
+                    <textarea class="form-control" id="taskDescription" rows="3" placeholder="Detalhes opcionais..."></textarea>
+                </div>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Prazo</label>
+                        <input type="datetime-local" class="form-control" id="taskDueDate">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Prioridade</label>
+                        <select class="form-select" id="taskPriority">
+                            <option value="high">🔴 Alta</option>
+                            <option value="medium" selected>🟡 Média</option>
+                            <option value="low">🟢 Baixa</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Status</label>
+                        <select class="form-select" id="taskStatus">
+                            <option value="pending">Pendente</option>
+                            <option value="in_progress">Em progresso</option>
+                            <option value="completed">Concluída</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Categoria</label>
+                        <select class="form-select" id="taskCategory">
+                            <option value="">Sem categoria</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveTask()">
+                    <i class="bi bi-save me-1"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL — CATEGORIA
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="categoryModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="categoryModalTitle">Nova Categoria</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="categoryId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="categoryName" placeholder="Ex: Trabalho">
+                </div>
+                <div class="mb-1">
+                    <label class="form-label fw-semibold">Cor</label>
+                    <div class="d-flex gap-2 flex-wrap" id="color-picker">
+                        <!-- Populado via JS -->
+                    </div>
+                    <input type="hidden" id="categoryColor" value="#6c757d">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveCategory()">
+                    <i class="bi bi-save me-1"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

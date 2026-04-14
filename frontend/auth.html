@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar | Task Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #667eea;
+            --primary-dark: #764ba2;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+            padding: 20px;
+        }
+
+        .auth-wrapper { width: 100%; max-width: 440px; }
+
+        .auth-logo {
+            text-align: center;
+            margin-bottom: 28px;
+            color: white;
+        }
+        .auth-logo i { font-size: 2.8rem; }
+        .auth-logo h1 { font-size: 1.6rem; font-weight: 700; margin: 8px 0 4px; }
+        .auth-logo p  { opacity: .85; font-size: .95rem; margin: 0; }
+
+        .auth-card {
+            background: rgba(255,255,255,0.97);
+            border-radius: 18px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+            overflow: hidden;
+        }
+
+        /* Tabs */
+        .auth-tabs {
+            display: flex;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 16px;
+            text-align: center;
+            font-weight: 600;
+            font-size: .95rem;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #6c757d;
+            transition: all .2s;
+            border-bottom: 3px solid transparent;
+        }
+        .auth-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: #f8f9ff;
+        }
+
+        .auth-body { padding: 32px; }
+
+        .form-label { font-weight: 600; font-size: .875rem; color: #495057; }
+
+        .form-control, .form-select {
+            border-radius: 10px;
+            padding: 11px 14px;
+            border: 1.5px solid #e0e0e0;
+            font-size: .95rem;
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102,126,234,.15);
+        }
+
+        .input-group .input-group-text {
+            border-radius: 10px 0 0 10px;
+            background: #f8f9fa;
+            border: 1.5px solid #e0e0e0;
+            border-right: none;
+            color: #6c757d;
+        }
+        .input-group .form-control { border-radius: 0 10px 10px 0; }
+
+        .btn-auth {
+            width: 100%;
+            padding: 13px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1rem;
+            border: none;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            cursor: pointer;
+            transition: transform .15s, box-shadow .15s, opacity .15s;
+            margin-top: 4px;
+        }
+        .btn-auth:hover  { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102,126,234,.4); }
+        .btn-auth:active { transform: translateY(0);    opacity: .92; }
+        .btn-auth:disabled { opacity: .65; cursor: not-allowed; transform: none; }
+
+        /* Indicador de força da senha */
+        .password-strength { margin-top: 6px; }
+        .strength-bar {
+            height: 4px;
+            border-radius: 4px;
+            background: #e9ecef;
+            overflow: hidden;
+        }
+        .strength-fill {
+            height: 100%;
+            border-radius: 4px;
+            width: 0;
+            transition: width .3s, background .3s;
+        }
+        .strength-label { font-size: .75rem; margin-top: 3px; }
+
+        /* Alertas */
+        .alert { border-radius: 10px; font-size: .9rem; padding: 12px 16px; }
+        .alert-danger  { background: #fff5f5; border: 1px solid #fecaca; color: #c0392b; }
+        .alert-success { background: #f0fff4; border: 1px solid #bbf7d0; color: #166534; }
+
+        .toggle-password {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #6c757d;
+            z-index: 5;
+        }
+        .password-wrap { position: relative; }
+        .password-wrap .form-control { padding-right: 42px; }
+    </style>
+</head>
+<body>
+<div class="auth-wrapper">
+    <div class="auth-logo">
+        <i class="bi bi-check2-circle"></i>
+        <h1>Task Manager</h1>
+        <p>Organize suas tarefas com eficiência</p>
+    </div>
+
+    <div class="auth-card">
+        <!-- Tabs -->
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tab-login"    onclick="showTab('login')">Entrar</button>
+            <button class="auth-tab"         id="tab-register" onclick="showTab('register')">Criar conta</button>
+        </div>
+
+        <div class="auth-body">
+            <!-- Alertas -->
+            <div id="alert-box" style="display:none;" class="alert mb-3"></div>
+
+            <!-- ── LOGIN ── -->
+            <div id="form-login">
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                        <input type="email" class="form-control" id="login-email" placeholder="seu@email.com" autocomplete="email">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Senha</label>
+                    <div class="password-wrap">
+                        <input type="password" class="form-control" id="login-password" placeholder="Sua senha" autocomplete="current-password">
+                        <i class="bi bi-eye toggle-password" onclick="togglePwd('login-password', this)"></i>
+                    </div>
+                </div>
+                <button class="btn-auth" id="btn-login" onclick="doLogin()">
+                    <span id="btn-login-text">Entrar</span>
+                    <span id="btn-login-spinner" class="spinner-border spinner-border-sm ms-2" style="display:none;"></span>
+                </button>
+            </div>
+
+            <!-- ── REGISTRO ── -->
+            <div id="form-register" style="display:none;">
+                <div class="mb-3">
+                    <label class="form-label">Nome de usuário</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                        <input type="text" class="form-control" id="reg-username" placeholder="Seu nome" autocomplete="username">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                        <input type="email" class="form-control" id="reg-email" placeholder="seu@email.com" autocomplete="email">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Senha</label>
+                    <div class="password-wrap">
+                        <input type="password" class="form-control" id="reg-password" placeholder="Mín. 8 caracteres com número" autocomplete="new-password" oninput="checkStrength(this.value)">
+                        <i class="bi bi-eye toggle-password" onclick="togglePwd('reg-password', this)"></i>
+                    </div>
+                    <div class="password-strength">
+                        <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+                        <div class="strength-label text-muted" id="strength-label"></div>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Confirmar senha</label>
+                    <div class="password-wrap">
+                        <input type="password" class="form-control" id="reg-confirm" placeholder="Digite a senha novamente" autocomplete="new-password">
+                        <i class="bi bi-eye toggle-password" onclick="togglePwd('reg-confirm', this)"></i>
+                    </div>
+                </div>
+                <button class="btn-auth" id="btn-register" onclick="doRegister()">
+                    <span id="btn-register-text">Criar conta</span>
+                    <span id="btn-register-spinner" class="spinner-border spinner-border-sm ms-2" style="display:none;"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── URL da API (automático: localhost em dev, mesmo domínio no Vercel) ──
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000'
+    : '';
+
+// ── Tab ──────────────────────────────────────────────────────────────────
+function showTab(tab) {
+    document.getElementById('form-login').style.display    = tab === 'login'    ? '' : 'none';
+    document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
+    document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
+    document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+    hideAlert();
+}
+
+// ── Alertas ──────────────────────────────────────────────────────────────
+function showAlert(msg, type = 'danger') {
+    const el = document.getElementById('alert-box');
+    el.className = `alert alert-${type} mb-3`;
+    el.textContent = msg;
+    el.style.display = '';
+    if (type === 'success') setTimeout(hideAlert, 3000);
+}
+function hideAlert() { document.getElementById('alert-box').style.display = 'none'; }
+
+// ── Mostrar/ocultar senha ─────────────────────────────────────────────────
+function togglePwd(id, icon) {
+    const input = document.getElementById(id);
+    const isText = input.type === 'text';
+    input.type = isText ? 'password' : 'text';
+    icon.className = isText ? 'bi bi-eye toggle-password' : 'bi bi-eye-slash toggle-password';
+}
+
+// ── Força da senha ─────────────────────────────────────────────────────
+function checkStrength(pw) {
+    let score = 0;
+    if (pw.length >= 8)           score++;
+    if (pw.length >= 12)          score++;
+    if (/[A-Z]/.test(pw))         score++;
+    if (/[0-9]/.test(pw))         score++;
+    if (/[^A-Za-z0-9]/.test(pw))  score++;
+
+    const configs = [
+        { w: '0%',   color: '#e9ecef', label: '' },
+        { w: '25%',  color: '#ef4444', label: 'Muito fraca' },
+        { w: '50%',  color: '#f97316', label: 'Fraca' },
+        { w: '75%',  color: '#eab308', label: 'Boa' },
+        { w: '90%',  color: '#22c55e', label: 'Forte' },
+        { w: '100%', color: '#16a34a', label: 'Muito forte' },
+    ];
+    const c = configs[Math.min(score, 5)];
+    document.getElementById('strength-fill').style.width      = c.w;
+    document.getElementById('strength-fill').style.background = c.color;
+    document.getElementById('strength-label').textContent     = c.label;
+    document.getElementById('strength-label').style.color     = c.color;
+}
+
+// ── Spinner helper ─────────────────────────────────────────────────────
+function setLoading(prefix, loading) {
+    document.getElementById(`btn-${prefix}`).disabled              = loading;
+    document.getElementById(`btn-${prefix}-spinner`).style.display = loading ? '' : 'none';
+}
+
+// ── Login ──────────────────────────────────────────────────────────────
+async function doLogin() {
+    const email    = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    if (!email || !password) { showAlert('Preencha email e senha.'); return; }
+
+    setLoading('login', true);
+    hideAlert();
+
+    try {
+        const res  = await fetch(`${API}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            localStorage.setItem('access_token',  data.tokens.access_token);
+            localStorage.setItem('refresh_token', data.tokens.refresh_token);
+            localStorage.setItem('user',          JSON.stringify(data.user));
+            showAlert('Login realizado! Redirecionando...', 'success');
+            setTimeout(() => window.location.href = 'index.html', 900);
+        } else {
+            showAlert(data.message || 'Credenciais inválidas.');
+        }
+    } catch {
+        showAlert('Não foi possível conectar ao servidor.');
+    } finally {
+        setLoading('login', false);
+    }
+}
+
+// ── Registro ───────────────────────────────────────────────────────────
+async function doRegister() {
+    const username = document.getElementById('reg-username').value.trim();
+    const email    = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const confirm  = document.getElementById('reg-confirm').value;
+
+    if (!username || !email || !password || !confirm) { showAlert('Preencha todos os campos.'); return; }
+    if (password !== confirm) { showAlert('As senhas não coincidem.'); return; }
+    if (password.length < 8)  { showAlert('A senha deve ter pelo menos 8 caracteres.'); return; }
+
+    setLoading('register', true);
+    hideAlert();
+
+    try {
+        const res  = await fetch(`${API}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            localStorage.setItem('access_token',  data.tokens.access_token);
+            localStorage.setItem('refresh_token', data.tokens.refresh_token);
+            localStorage.setItem('user',          JSON.stringify(data.user));
+            showAlert('Conta criada! Redirecionando...', 'success');
+            setTimeout(() => window.location.href = 'index.html', 900);
+        } else {
+            showAlert(data.message || 'Erro ao criar conta.');
+        }
+    } catch {
+        showAlert('Não foi possível conectar ao servidor.');
+    } finally {
+        setLoading('register', false);
+    }
+}
+
+// ── Enter key ──────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const loginVisible = document.getElementById('form-login').style.display !== 'none';
+    if (loginVisible) doLogin(); else doRegister();
+});
+
+// ── Já logado? ─────────────────────────────────────────────────────────
+if (localStorage.getItem('access_token')) window.location.href = 'index.html';
+</script>
+</body>
+</html>
