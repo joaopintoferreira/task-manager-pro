@@ -5,8 +5,10 @@ import jwt
 from datetime import datetime, timedelta
 #from app.models import db, User, RefreshToken
 from backend.app.models import db, User, RefreshToken
-from app.utils import validate_password, validate_email
-from app import limiter
+#from app.utils import validate_password, validate_email
+from backend.app.utils import validate_password, validate_email
+#from app import limiter
+from backend.app import limiter
 
 logger = logging.getLogger(__name__)
 auth_bp = Blueprint('auth', __name__)
