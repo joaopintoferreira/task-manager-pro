@@ -590,7 +590,7 @@ async function doLogout() {
         });
     } catch { /* segue */ }
     localStorage.clear();
-    window.location.href = 'auth.html';
+    window.location.href = '/';
 }
 
 // ══════════════════════════════════════════════
