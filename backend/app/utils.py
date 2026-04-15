@@ -5,7 +5,8 @@ import re
 import logging
 from datetime import datetime, timedelta
 from flask import jsonify
-from app.models import db, Notification, Task, RefreshToken
+#from app.models import db, Notification, Task, RefreshToken
+from backend.app.models import db, Notification, Task, RefreshToken
 
 logger = logging.getLogger(__name__)
 

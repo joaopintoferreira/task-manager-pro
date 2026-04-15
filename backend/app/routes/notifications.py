@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify
-from app.models import db, Notification
-from app.auth import token_required
+#from app.models import db, Notification
+from backend.app.models import db, Notification
+#from app.auth import token_required
+from backend.app.auth import token_required
 
 notifications_bp = Blueprint('notifications', __name__)
 

@@ -1,7 +1,9 @@
 import logging
 from flask import Blueprint, request, jsonify
-from app.models import db, Category, Task
-from app.auth import token_required
+#from app.models import db, Category, Task
+from backend.app.models import db, Category, Task
+#from app.auth import token_required
+from backend.app.auth import token_requiredS
 
 logger = logging.getLogger(__name__)
 categories_bp = Blueprint('categories', __name__)

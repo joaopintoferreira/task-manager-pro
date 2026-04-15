@@ -3,7 +3,8 @@ from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
 import jwt
 from datetime import datetime, timedelta
-from app.models import db, User, RefreshToken
+#from app.models import db, User, RefreshToken
+from backend.app.models import db, User, RefreshToken
 from app.utils import validate_password, validate_email
 from app import limiter
 
