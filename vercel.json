@@ -11,13 +11,14 @@
     }
   ],
   "routes": [
-  {
-    "src": "/(auth|tasks|categories|notifications)(.*)",
-    "dest": "backend/wsgi.py"
-  },
-  {
-    "src": "/(.*)",
-    "dest": "frontend/$1"
-  }
-]
+    { "src": "/auth/(.*)",          "dest": "backend/wsgi.py" },
+    { "src": "/tasks/(.*)",         "dest": "backend/wsgi.py" },
+    { "src": "/categories/(.*)",    "dest": "backend/wsgi.py" },
+    { "src": "/notifications/(.*)", "dest": "backend/wsgi.py" },
+
+    { "src": "/api/(.*)",           "dest": "backend/wsgi.py" },
+
+    { "src": "/",                  "dest": "frontend/index.html" },
+    { "src": "/(.*)",              "dest": "frontend/$1" }
+  ]
 }
