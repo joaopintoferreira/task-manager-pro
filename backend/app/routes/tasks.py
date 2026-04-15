@@ -6,7 +6,7 @@ from backend.app.models import db, Task, Category, TaskCollaborator, Notificatio
 #from app.auth import token_required
 from backend.app.auth import token_required
 #from app.utils import create_notification
-from backend.app.utils import create_notificationS
+from backend.app.utils import create_notification
 
 logger = logging.getLogger(__name__)
 tasks_bp = Blueprint('tasks', __name__)
