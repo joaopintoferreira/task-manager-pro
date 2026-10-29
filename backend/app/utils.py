@@ -3,7 +3,7 @@ Utilitários — Task Manager
 """
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import jsonify
 #from app.models import db, Notification, Task, RefreshToken
 from backend.app.models import db, Notification, Task, RefreshToken
@@ -14,9 +14,15 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────
 # Notificações
 # ──────────────────────────────────────────────
-def create_notification(user_id, title, message, notification_type, task_id=None):
-    try:
-        notification = Notification(
+def create_notification(user_id, title, message, notification_type, task_id=None, commit=True):
+    """Cria uma notificação.
+
+    commit=True (padrão): grava logo e engole falhas (a notificação nunca derruba quem chama).
+    commit=False: apenas adiciona à sessão, para entrar na mesma transação do chamador — assim
+    a operação principal e a notificação são gravadas juntas ou nenhuma delas.
+    """
+    def build():
+        return Notification(
             user_id=user_id,
             title=title,
             message=message,
@@ -25,6 +31,14 @@ def create_notification(user_id, title, message, notification_type, task_id=None
             is_read=False,
             created_at=datetime.utcnow(),
         )
+
+    if not commit:
+        notification = build()
+        db.session.add(notification)
+        return notification
+
+    try:
+        notification = build()
         db.session.add(notification)
         db.session.commit()
         logger.debug(f"Notificação criada para user {user_id}: {title}")
@@ -77,6 +91,28 @@ def check_due_date_notifications():
 # ──────────────────────────────────────────────
 # Validações
 # ──────────────────────────────────────────────
+def int_arg(value, default, minimum=None, maximum=None):
+    """Converte parâmetro de query para int; valor ausente/inválido retorna o padrão."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return default
+    if minimum is not None:
+        n = max(minimum, n)
+    if maximum is not None:
+        n = min(maximum, n)
+    return n
+
+
+def parse_datetime(value):
+    """ISO 8601 -> datetime naive em UTC (as colunas são TIMESTAMP sem fuso).
+    Levanta ValueError/TypeError se inválido."""
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
 def validate_email(email: str) -> bool:
     pattern = r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$'
     return bool(re.match(pattern, email))

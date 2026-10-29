@@ -24,6 +24,11 @@ def create_category(current_user):
 
     if not name:
         return jsonify({'message': 'Nome da categoria é obrigatório!'}), 400
+    if len(name) > 80:
+        return jsonify({'message': 'Nome deve ter no máximo 80 caracteres!'}), 400
+    color = data.get('color', '#6c757d')
+    if not isinstance(color, str) or len(color) > 20:
+        return jsonify({'message': 'Cor inválida!'}), 400
 
     # Evitar duplicatas por usuário
     if Category.query.filter_by(user_id=current_user.id, name=name).first():
@@ -31,7 +36,7 @@ def create_category(current_user):
 
     category = Category(
         name=name,
-        color=data.get('color', '#6c757d'),
+        color=color,
         user_id=current_user.id,
     )
 
@@ -53,9 +58,11 @@ def update_category(current_user, category_id):
     data = request.get_json() or {}
 
     if 'name' in data:
-        name = data['name'].strip()
+        name = (data['name'] or '').strip() if isinstance(data['name'], str) else ''
         if not name:
             return jsonify({'message': 'Nome não pode ser vazio!'}), 400
+        if len(name) > 80:
+            return jsonify({'message': 'Nome deve ter no máximo 80 caracteres!'}), 400
         # Verificar conflito de nome (exceto a própria)
         existing = Category.query.filter_by(user_id=current_user.id, name=name).first()
         if existing and existing.id != category_id:
@@ -63,6 +70,8 @@ def update_category(current_user, category_id):
         category.name = name
 
     if 'color' in data:
+        if not isinstance(data['color'], str) or len(data['color']) > 20:
+            return jsonify({'message': 'Cor inválida!'}), 400
         category.color = data['color']
 
     db.session.commit()

@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify
 from backend.app.models import db, Notification
 #from app.auth import token_required
 from backend.app.auth import token_required
+from backend.app.utils import int_arg
 
 notifications_bp = Blueprint('notifications', __name__)
 
@@ -11,7 +12,7 @@ notifications_bp = Blueprint('notifications', __name__)
 @token_required
 def get_notifications(current_user):
     unread_only = request.args.get('unread_only', 'false').lower() == 'true'
-    limit       = min(100, max(1, int(request.args.get('limit', 20))))
+    limit       = int_arg(request.args.get('limit'), 20, 1, 100)
 
     query = Notification.query.filter_by(user_id=current_user.id)
     if unread_only:

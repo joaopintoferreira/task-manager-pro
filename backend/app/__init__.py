@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_limiter import Limiter
@@ -14,6 +14,9 @@ migrate = Migrate()
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
+    # Preflights CORS (OPTIONS) não consomem o limite: um 429 no preflight faz o navegador
+    # bloquear a requisição real, e eles não carregam dados nem passam pela autenticação.
+    default_limits_exempt_when=lambda: request.method == 'OPTIONS',
     storage_uri="memory://",
 )
 
@@ -27,10 +30,21 @@ def create_app(config_class=None):
         #if db_url.startswith('postgresql'):
         if 'postgres' in db_url:
             config_class = ProductionConfig
+        elif os.environ.get('VERCEL'):
+            # O filesystem da Vercel é somente leitura: SQLite não é uma opção
+            raise RuntimeError(
+                "DATABASE_URL não definida (ou não é PostgreSQL). "
+                "Configure a connection string do NeonDB nas variáveis de ambiente da Vercel."
+            )
         else:
             config_class = DevelopmentConfig
 
     app.config.from_object(config_class)
+
+    if not app.config.get('SECRET_KEY'):
+        raise RuntimeError(
+            "SECRET_KEY não definida. Configure a variável de ambiente SECRET_KEY."
+        )
 
     # ── Logging ───────────────────────────────
     log_level = logging.DEBUG if app.config['DEBUG'] else logging.INFO
@@ -81,6 +95,10 @@ def create_app(config_class=None):
     @app.errorhandler(405)
     def method_not_allowed(e):
         return jsonify({'error': 'Método não permitido'}), 405
+
+    @app.errorhandler(413)
+    def payload_too_large(e):
+        return jsonify({'message': 'Requisição muito grande (máximo 2 MB).'}), 413
 
     @app.errorhandler(429)
     def rate_limit_exceeded(e):

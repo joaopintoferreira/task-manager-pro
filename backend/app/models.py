@@ -1,8 +1,22 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
+
+
+def iso_utc(dt):
+    """Serializa um datetime como ISO 8601 em UTC com sufixo 'Z'.
+
+    As colunas são TIMESTAMP sem fuso e guardam sempre UTC (datetime.utcnow).
+    O sufixo 'Z' deixa explícito para o cliente que é UTC; sem ele o JavaScript
+    interpretaria o valor como horário local.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.isoformat() + 'Z'
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -28,13 +42,32 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
+        # Consulta só a data: o conteúdo binário da foto não é carregado aqui
+        avatar_updated_at = db.session.query(UserAvatar.updated_at).filter_by(user_id=self.id).scalar()
         return {
             'id':         self.id,
             'username':   self.username,
             'email':      self.email,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'created_at': iso_utc(self.created_at),
             'is_active':  self.is_active,
+            'has_avatar': avatar_updated_at is not None,
+            'avatar_updated_at': iso_utc(avatar_updated_at),
         }
+
+
+class UserAvatar(db.Model):
+    """Foto de perfil (uma por usuário), armazenada no PostgreSQL.
+
+    Fica em tabela própria para que a imagem não seja carregada junto com o
+    usuário a cada requisição autenticada. Armazenar no banco evita depender do
+    disco local, que é efêmero na Vercel.
+    """
+    __tablename__ = 'user_avatars'
+
+    user_id      = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    content_type = db.Column(db.String(50), nullable=False)
+    data         = db.Column(db.LargeBinary, nullable=False)
+    updated_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
 class RefreshToken(db.Model):
@@ -91,12 +124,14 @@ class Task(db.Model):
             'id':           self.id,
             'title':        self.title,
             'description':  self.description,
-            'due_date':     self.due_date.isoformat() if self.due_date else None,
+            'due_date':     iso_utc(self.due_date),
             'priority':     self.priority,
             'status':       self.status,
-            'created_at':   self.created_at.isoformat(),
-            'updated_at':   self.updated_at.isoformat(),
+            'created_at':   iso_utc(self.created_at),
+            'updated_at':   iso_utc(self.updated_at),
             'user_id':      self.user_id,
+            # Nome do dono para quem vê a tarefa partilhada (sem email); None se o dono não existir
+            'owner':        {'id': self.owner.id, 'username': self.owner.username} if self.owner else None,
             'category_id':  self.category_id,
             'category':     self.category.to_dict() if self.category else None,
             'collaborators': [c.to_dict() for c in self.collaborators],
@@ -111,6 +146,11 @@ class Task(db.Model):
         if self.user_id == user_id:
             return True
         return self.collaborators.filter_by(user_id=user_id).first() is not None
+
+    def can_edit(self, user_id):
+        if self.user_id == user_id:
+            return True
+        return self.collaborators.filter_by(user_id=user_id, role='editor').first() is not None
 
 
 class TaskCollaborator(db.Model):
@@ -156,6 +196,6 @@ class Notification(db.Model):
             'message':    self.message,
             'type':       self.type,
             'is_read':    self.is_read,
-            'created_at': self.created_at.isoformat(),
+            'created_at': iso_utc(self.created_at),
             'task_id':    self.task_id,
         }
