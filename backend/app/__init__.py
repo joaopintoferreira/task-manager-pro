@@ -72,11 +72,13 @@ def create_app(config_class=None):
     from backend.app.routes.tasks import tasks_bp
     from backend.app.routes.categories import categories_bp
     from backend.app.routes.notifications import notifications_bp
+    from backend.app.routes.ai import ai_bp
 
     app.register_blueprint(auth_bp,          url_prefix='/auth')
     app.register_blueprint(tasks_bp,         url_prefix='/tasks')
     app.register_blueprint(categories_bp,    url_prefix='/categories')
     app.register_blueprint(notifications_bp, url_prefix='/notifications')
+    app.register_blueprint(ai_bp,            url_prefix='/ai')
 
     # ── Rota raiz ─────────────────────────────
     @app.route('/')

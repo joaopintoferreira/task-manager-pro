@@ -22,6 +22,7 @@ Aplicação de gerenciamento de tarefas com autenticação JWT, categorias, noti
 - Sistema de notificações
 - Colaboração entre usuários em tarefas
 - Dashboard com estatísticas
+- Assistente de IA (Groq ou OpenRouter), opcional e configurável — veja [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md)
 - Rate limiting e validação de senha
 - Interface responsiva
 
@@ -88,6 +89,8 @@ Se servir o frontend em outra porta, inclua a origem em `CORS_ORIGINS`.
 ```bash
 python -m unittest backend.tests.test_api -v     # backend
 node frontend/tests/time.test.js                 # helpers de data/hora do frontend
+python -m unittest backend.tests.test_ai -v      # assistente de IA (chamadas ao provedor simuladas)
+node frontend/tests/assistant.test.js            # tela do assistente de IA
 ```
 
 Os testes usam SQLite temporário e **não** acessam o NeonDB. Cobrem autenticação (jti, rotação e revogação de refresh tokens),
@@ -132,6 +135,9 @@ Template completo em `backend/.env.example`.
 | `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` | não | Minutos (padrão 15) / dias (padrão 7) |
 | `CORS_ORIGINS` | não | Origens permitidas, separadas por vírgula (só se o frontend estiver em outro domínio) |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | não | Pool por instância (padrão 2 / 0) |
+
+O assistente de IA usa variáveis próprias (`AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, `AI_TIMEOUT_SECONDS`,
+`AI_MAX_TOKENS`), todas opcionais: sem elas o recurso fica desativado. Detalhes em [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md).
 
 ## Deploy na Vercel
 

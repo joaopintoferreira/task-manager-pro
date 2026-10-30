@@ -21,6 +21,15 @@ class Config:
 
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:5500').split(',')
 
+    # ── Assistente de IA (opcional; sem AI_PROVIDER/AI_API_KEY/AI_MODEL o recurso fica desativado) ──
+    # Sem modelo padrão de propósito: o modelo disponível/gratuito muda e deve ser escolhido pelo operador.
+    AI_PROVIDER = (os.getenv('AI_PROVIDER') or '').strip().lower()      # groq | openrouter
+    AI_API_KEY  = (os.getenv('AI_API_KEY') or '').strip()
+    AI_MODEL    = (os.getenv('AI_MODEL') or '').strip()
+    AI_BASE_URL = (os.getenv('AI_BASE_URL') or '').strip()              # opcional: endpoint oficial se vazio
+    AI_TIMEOUT_SECONDS = os.getenv('AI_TIMEOUT_SECONDS') or '20'
+    AI_MAX_TOKENS      = os.getenv('AI_MAX_TOKENS') or '600'
+
     DEBUG = False
     TESTING = False
 

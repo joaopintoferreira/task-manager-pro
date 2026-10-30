@@ -180,6 +180,7 @@ async function loadAll() {
 }
 
 function refreshActiveView() {
+    if (state.view === 'assistant') return Promise.resolve();   // a conversa não depende da lista de tarefas
     return state.view === 'tasks' ? loadTasks() : loadRecentTasks();
 }
 
@@ -860,18 +861,22 @@ function setFilter(filter) {
 // Alterna entre a vista do dashboard e a lista de tarefas.
 // `filter` indica qual item da navegação fica ativo na vista de lista.
 function showView(view, title, filter) {
-    const isDash = view === 'dashboard';
-    state.view = isDash ? 'dashboard' : 'tasks';
+    const isDash      = view === 'dashboard';
+    const isAssistant = view === 'assistant';
+    state.view = isDash ? 'dashboard' : (isAssistant ? 'assistant' : 'tasks');
     document.getElementById('dashboard-view').hidden = !isDash;
-    document.getElementById('tasks-view').hidden     = isDash;
-    document.getElementById('page-title').textContent = isDash ? 'Dashboard' : (title || 'Tarefas');
+    document.getElementById('tasks-view').hidden     = isDash || isAssistant;
+    document.getElementById('assistant-view').hidden = !isAssistant;
+    document.getElementById('page-title').textContent =
+        isDash ? 'Dashboard' : (isAssistant ? 'Assistente de IA' : (title || 'Tarefas'));
 
     document.querySelectorAll('.nav-link').forEach(a => {
-        const active = isDash ? a.dataset.view === 'dashboard' : a.dataset.filter === filter;
+        const active = (isDash || isAssistant) ? a.dataset.view === view : a.dataset.filter === filter;
         a.classList.toggle('active', active);
     });
 
     if (isDash) loadDashboard();
+    if (isAssistant) onAssistantShown();       // definido em assistant.js
     if (window.innerWidth < 768 && document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
 }
 
@@ -1194,6 +1199,7 @@ function renderTaskPanel(t) {
     const actions = [];
     if (acc.canEdit)   actions.push('<button type="button" class="btn-secondary-sm" onclick="editFromPanel()"><i class="bi bi-pencil"></i> Editar</button>');
     if (acc.canDelete) actions.push('<button type="button" class="btn-secondary-sm danger" onclick="deleteFromPanel()"><i class="bi bi-trash"></i> Excluir</button>');
+    actions.push('<button type="button" class="btn-secondary-sm" onclick="askAiAboutTask()"><i class="bi bi-stars"></i> Perguntar à IA</button>');
     document.getElementById('task-panel-foot').innerHTML = actions.join('');
     document.getElementById('task-panel-foot').hidden = !actions.length;
     document.getElementById('task-panel-body').scrollTop = 0;

@@ -15,7 +15,8 @@
     </script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="style.css?v=9" rel="stylesheet">
+    <link href="style.css?v=10" rel="stylesheet">
+    <link href="assistant.css?v=2" rel="stylesheet">
 </head>
 <body>
 
@@ -58,6 +59,10 @@
     <nav class="sidebar-nav">
         <a class="nav-link active" href="#" data-view="dashboard" onclick="showView('dashboard'); return false;">
             <i class="bi bi-grid-1x2"></i> Dashboard
+        </a>
+
+        <a class="nav-link" href="#" data-view="assistant" onclick="showView('assistant'); return false;">
+            <i class="bi bi-stars"></i> Assistente de IA
         </a>
 
         <div class="nav-section-label">Tarefas</div>
@@ -278,6 +283,80 @@
         </button>
     </div>
     </div><!-- /tasks-view -->
+
+    <!-- ═══ Vista: Assistente de IA ═══ -->
+    <div class="view" id="assistant-view" hidden>
+        <div class="assistant">
+            <header class="assistant-head">
+                <div>
+                    <h2 class="assistant-title">Assistente de IA</h2>
+                    <p class="assistant-sub">Orientação sobre organização, prioridades e produtividade. O assistente só responde: não cria nem altera tarefas.</p>
+                </div>
+                <button type="button" class="btn-secondary-sm" id="assistant-clear" onclick="assistantClear()">
+                    <i class="bi bi-eraser"></i> Limpar conversa
+                </button>
+            </header>
+
+            <section class="assistant-context" aria-label="Contexto da conversa">
+                <label class="form-label" for="assistant-task">Contextualizar com uma tarefa (opcional)</label>
+                <select class="form-select" id="assistant-task" onchange="assistantSelectTask(this.value)">
+                    <option value="">Sem tarefa — conversa geral</option>
+                </select>
+
+                <div class="assistant-consent" id="assistant-consent" role="group" aria-labelledby="assistant-consent-text" hidden>
+                    <p id="assistant-consent-text"><i class="bi bi-shield-exclamation" aria-hidden="true"></i>
+                        O conteúdo desta tarefa será enviado ao provedor externo de IA para gerar uma resposta. Evite incluir informações pessoais ou confidenciais.</p>
+                    <div class="assistant-consent-actions">
+                        <button type="button" class="btn-primary-sm" id="assistant-consent-accept" onclick="assistantAcceptConsent()">Aceitar e usar contexto</button>
+                        <button type="button" class="btn-secondary-sm" id="assistant-consent-decline" onclick="assistantDeclineConsent()">Cancelar</button>
+                    </div>
+                </div>
+
+                <div class="assistant-chip" id="assistant-chip" hidden>
+                    <i class="bi bi-paperclip" aria-hidden="true"></i>
+                    <span>Contexto ativo: <strong id="assistant-chip-title"></strong></span>
+                    <button type="button" id="assistant-chip-remove" onclick="assistantRemoveContext()"
+                            aria-label="Remover o contexto da tarefa" title="Remover contexto">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </section>
+
+            <div class="assistant-log" id="assistant-log" role="log" aria-live="polite" aria-relevant="additions"
+                 aria-label="Conversa com o assistente" aria-busy="false" tabindex="0">
+                <div class="assistant-welcome" id="assistant-welcome">
+                    <i class="bi bi-stars" aria-hidden="true"></i>
+                    <h3>Como posso ajudar?</h3>
+                    <p>Pergunte sobre organização, prioridades, produtividade ou como usar o Task Manager Pro. Para falar de uma tarefa concreta, escolha-a acima.</p>
+                    <div class="assistant-examples" role="group" aria-label="Exemplos de perguntas">
+                        <button type="button" onclick="assistantUseExample(this.textContent)">Como posso priorizar as minhas tarefas desta semana?</button>
+                        <button type="button" onclick="assistantUseExample(this.textContent)">Como divido um projeto grande em tarefas menores?</button>
+                        <button type="button" onclick="assistantUseExample(this.textContent)">Dê dicas para gerir melhor o meu tempo.</button>
+                        <button type="button" onclick="assistantUseExample(this.textContent)">Como partilho uma tarefa com um colega?</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="assistant-error" id="assistant-error" role="alert" hidden>
+                <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                <span id="assistant-error-text"></span>
+                <button type="button" id="assistant-retry" class="btn-secondary-sm" onclick="assistantRetry()">
+                    <i class="bi bi-arrow-clockwise"></i> Tentar novamente
+                </button>
+            </div>
+
+            <form class="assistant-form" id="assistant-form" onsubmit="event.preventDefault(); assistantSend();">
+                <label class="visually-hidden" for="assistant-input">Mensagem para o assistente</label>
+                <textarea id="assistant-input" rows="2" maxlength="2000" autocomplete="off"
+                          placeholder="Escreva a sua dúvida…"
+                          onkeydown="assistantKeydown(event)" oninput="assistantOnInput()"></textarea>
+                <button type="submit" class="btn-primary-sm" id="assistant-send" aria-label="Enviar mensagem">
+                    <i class="bi bi-send"></i> <span class="btn-label">Enviar</span>
+                </button>
+            </form>
+            <p class="assistant-foot">As respostas são geradas por IA e podem conter erros: confirme o que for importante. A conversa não é guardada. Enter envia; Shift+Enter quebra a linha.</p>
+        </div>
+    </div>
 </div>
 
 <!-- ══════════════════════════════════════════════
@@ -458,6 +537,7 @@
 <div class="toast-wrap" id="toast-wrap"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="script.js?v=9"></script>
+<script src="script.js?v=10"></script>
+<script src="assistant.js?v=2"></script>
 </body>
 </html>
