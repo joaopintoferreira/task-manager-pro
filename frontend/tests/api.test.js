@@ -294,5 +294,83 @@ async function test(name, fn) { await fn(); passed++; console.log('ok -', name);
         assert(/localStorage\.setItem\('theme'/.test(html));
     });
 
+    // ── Logout: dois pontos de acesso (sidebar e perfil), uma única implementação ──
+    const INDEX = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const CSS = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8');
+    const block = (css, selector) => {      // corpo da primeira regra cujo seletor é exatamente `selector`
+        const m = css.match(new RegExp('(?:^|\\n)' + selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}'));
+        assert(m, `regra não encontrada: ${selector}`);
+        return m[1];
+    };
+
+    await test('logout: botão original na sidebar e segundo botão no perfil chamam a mesma função', async () => {
+        const handlers = [...INDEX.matchAll(/onclick="([^"]*[Ll]ogout[^"]*)"/g)].map(m => m[1]);
+        assert.deepStrictEqual(handlers, ['doLogout()', 'doLogout()'], 'exatamente dois pontos de acesso, ambos doLogout()');
+        const sidebarFooter = INDEX.match(/<div class="sidebar-footer">[\s\S]*?<\/div>/)[0];
+        assert(/class="btn-logout"[^>]*onclick="doLogout\(\)"/.test(sidebarFooter), 'botão original mantido na sidebar');
+        const modal = INDEX.match(/<div class="modal fade" id="profileModal"[\s\S]*?<!-- Toast -->/)[0];
+        const body = modal.match(/<div class="modal-body[\s\S]*?<div class="modal-footer">/)[0];
+        assert(/id="profile-logout"[^>]*onclick="doLogout\(\)"/.test(body), 'botão Sair no corpo do modal de perfil');
+        assert(!/id="profile-logout"[^>]*\bdisabled\b/.test(body), 'não começa desativado (ao contrário dos botões de foto)');
+        assert(/Sair/.test(body.match(/id="profile-logout"[\s\S]*?<\/button>/)[0]));
+        assert(/function doLogout/.test(src) && (src.match(/function doLogout/g) || []).length === 1, 'uma só implementação');
+        assert(!/\/auth\/logout/.test(INDEX), 'o HTML não contém lógica de logout');
+    });
+
+    const logoutCtx = () => {
+        const calls = [], cleared = [], redirects = [];
+        const ctx = {
+            refreshToken: 'RT', console, Promise,
+            stopRelativeTimeUpdates: () => calls.push('stop'),
+            apiRequest: async (url, opts) => { calls.push({ url, opts }); return { ok: true }; },
+            localStorage: { clear: () => cleared.push(1) },
+            loginPageUrl: () => '/',
+        };
+        ctx.window = { location: { set href(v) { redirects.push(v); } } };
+        vm.createContext(ctx);
+        vm.runInContext(slice('let loggingOut', '// ══════════════════════════════════════════════\n// TOAST'), ctx);
+        return { ctx, calls, cleared, redirects };
+    };
+
+    await test('logout: revoga o refresh token, limpa a sessão e redireciona uma única vez, qualquer que seja o botão', async () => {
+        const c = logoutCtx();
+        await Promise.all([c.ctx.doLogout(), c.ctx.doLogout()]);      // clique na sidebar + clique no perfil
+        const api = c.calls.filter(x => x !== 'stop');
+        assert.strictEqual(api.length, 1, 'só um pedido de logout');
+        assert.strictEqual(api[0].url, '/auth/logout');
+        assert.strictEqual(api[0].opts.method, 'POST');
+        assert.strictEqual(api[0].opts.skipRefresh, true);
+        assert.deepStrictEqual(JSON.parse(api[0].opts.body), { refresh_token: 'RT' });
+        assert.strictEqual(c.cleared.length, 1);
+        assert.deepStrictEqual(c.redirects, ['/']);
+    });
+
+    await test('logout: se o pedido falhar a sessão local é limpa e o utilizador sai na mesma', async () => {
+        const c = logoutCtx();
+        c.ctx.apiRequest = async () => { throw new TypeError('sem rede'); };
+        await c.ctx.doLogout();
+        assert.strictEqual(c.cleared.length, 1);
+        assert.deepStrictEqual(c.redirects, ['/']);
+    });
+
+    await test('sidebar mobile: 100dvh com fallback 100vh, navegação encolhível e rodapé sempre visível', async () => {
+        const side = block(CSS, '.sidebar');
+        const vh = side.indexOf('height: 100vh'), dvh = side.indexOf('height: 100dvh');
+        assert(vh >= 0 && dvh > vh, 'fallback 100vh antes de 100dvh (a última declaração válida vence)');
+        assert(/min-height:\s*0/.test(block(CSS, '.sidebar-nav')) && /overflow-y:\s*auto/.test(block(CSS, '.sidebar-nav')));
+        const footer = block(CSS, '.sidebar-footer');
+        assert(/flex-shrink:\s*0/.test(footer) && /env\(safe-area-inset-bottom\)/.test(footer));
+        assert(/\.sidebar\s*\{\s*transform:\s*translateX\(-100%\)/.test(CSS), 'comportamento mobile (fora do ecrã) preservado');
+        assert(/\.sidebar\.open\s*\{\s*transform:\s*translateX\(0\)/.test(CSS));
+        assert(/\.main-content\s*\{\s*margin-left:\s*0/.test(CSS));
+    });
+
+    await test('perfil: o separador do botão Sair usa variáveis de tema (claro e escuro) e as versões dos assets foram atualizadas', async () => {
+        assert(/var\(--border\)/.test(block(CSS, '.profile-logout')));
+        assert(/\[data-theme="dark"\]\s*\{[^}]*--border:/.test(CSS), '--border definido no tema escuro');
+        const v = re => Number(INDEX.match(re)[1]);
+        assert(v(/style\.css\?v=(\d+)/) >= 11 && v(/script\.js\?v=(\d+)/) >= 11, 'cache-busting para o telemóvel receber a correção');
+    });
+
     console.log(`\n${passed} testes de api/frontend passaram`);
 })().catch(e => { console.error('FALHOU:', e.message); process.exit(1); });

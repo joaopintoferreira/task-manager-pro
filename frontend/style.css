@@ -122,7 +122,10 @@ button { cursor: pointer; font-family: inherit; }
     position: fixed;
     top: 0; left: 0;
     width: var(--sidebar-w);
-    height: 100vh;
+    height: 100vh;      /* fallback */
+    /* Nos browsers móveis `100vh` ignora a barra de endereço visível e empurra o rodapé ("Sair") para
+       fora do ecrã; `dvh` acompanha a altura realmente visível. */
+    height: 100dvh;
     background: var(--bg-sidebar);
     border-right: 1px solid var(--border);
     color: var(--text-main);
@@ -212,6 +215,7 @@ button { cursor: pointer; font-family: inherit; }
 /* Navegação */
 .sidebar-nav {
     flex: 1;
+    min-height: 0;      /* permite encolher e rolar por dentro, mantendo o rodapé visível */
     padding: 6px 10px 14px;
     overflow-y: auto;
 }
@@ -296,6 +300,7 @@ button { cursor: pointer; font-family: inherit; }
 /* Rodapé */
 .sidebar-footer {
     padding: 10px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
     flex-shrink: 0;
 }
@@ -311,6 +316,13 @@ button { cursor: pointer; font-family: inherit; }
     transition: all var(--transition);
 }
 .btn-logout:hover { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+
+/* "Sair" dentro do modal de perfil */
+.profile-logout {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
 
 /* Overlay mobile */
 .sidebar-overlay {

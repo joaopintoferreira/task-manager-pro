@@ -1664,7 +1664,10 @@ async function removeAvatar() {
 // ══════════════════════════════════════════════
 // LOGOUT
 // ══════════════════════════════════════════════
+let loggingOut = false;
 async function doLogout() {
+    if (loggingOut) return;      // dois pontos de acesso (sidebar e perfil): um segundo clique não repete o processo
+    loggingOut = true;
     stopRelativeTimeUpdates();
     try {
         // skipRefresh evita loop infinito quando a sessão já expirou (401 -> logout -> 401 ...)
