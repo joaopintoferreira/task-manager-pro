@@ -132,7 +132,7 @@ async function test(name, fn) { await fn(); passed++; console.log('ok -', name);
 
     await test('mapa de erros: mensagens compreensíveis, sem detalhes técnicos', async () => {
         const { ctx } = makeContext();
-        for (const code of ['ai_not_configured', 'ai_auth', 'ai_model', 'ai_rejected', 'ai_quota', 'ai_timeout', 'ai_unavailable', 'ai_bad_response', 'invalid_request']) {
+        for (const code of ['ai_not_configured', 'ai_auth', 'ai_model', 'ai_rejected', 'ai_quota', 'ai_timeout', 'ai_unavailable', 'ai_bad_response', 'ai_truncated', 'invalid_request']) {
             const t = ctx.assistantErrorInfo(502, code).text;
             assert(t.length > 20 && !/traceback|stack|exception|http \d{3}|api[_ ]?key|bearer/i.test(t), code);
         }
@@ -207,6 +207,30 @@ async function test(name, fn) { await fn(); passed++; console.log('ok -', name);
             assert.strictEqual(c.run('assistant.failed'), true);
         });
     }
+
+    await test('429 do próprio aplicativo: mensagem de ritmo (sem texto do servidor) e "Tentar novamente" funciona', async () => {
+        let n = 0;
+        const c = makeContext(() => (++n === 1
+            ? response(429, { error: 'Muitas requisições. Aguarde e tente novamente.' })
+            : ok('Resposta depois da espera.')));
+        type(c.document, 'Pergunta');
+        await c.ctx.assistantSend();
+        const text = c.document.byId('assistant-error-text').textContent;
+        assert(/depressa/.test(text) && !/Muitas requisições/.test(text), text);
+        assert(!/limite de uso|quota/i.test(text), 'não confundir com a quota do provedor');
+        assert.strictEqual(c.run('assistant.failed'), true);
+        await c.ctx.assistantRetry();
+        assert.strictEqual(c.calls.length, 2);
+        assert.strictEqual(c.document.byId('assistant-error').hidden, true);
+        assert.strictEqual(msgs(c.document).length, 2);
+        assert.strictEqual(c.run('assistant.failed'), false);
+    });
+
+    await test('429 do provedor (ai_quota) tem mensagem própria, distinta do 429 do aplicativo', async () => {
+        const { ctx } = makeContext();
+        assert(/limite de uso/.test(ctx.assistantErrorInfo(503, 'ai_quota').text));
+        assert(!/limite de uso/.test(ctx.assistantErrorInfo(429, undefined).text));
+    });
 
     await test('tentar novamente: reenvia sem duplicar a mensagem e mostra a resposta', async () => {
         let n = 0;
@@ -433,7 +457,14 @@ async function test(name, fn) { await fn(); passed++; console.log('ok -', name);
         assert(/<script src="assistant\.js/.test(INDEX_SRC) && /href="assistant\.css/.test(INDEX_SRC));
         assert(INDEX_SRC.indexOf('script.js') < INDEX_SRC.indexOf('assistant.js'), 'assistant.js depois de script.js');
         assert(/for="assistant-input"/.test(INDEX_SRC) && /for="assistant-task"/.test(INDEX_SRC), 'rótulos acessíveis');
-        assert(/O conteúdo desta tarefa será enviado ao provedor externo de IA para gerar uma resposta\. Evite incluir informações pessoais ou confidenciais\./.test(INDEX_SRC));
+        const consent = INDEX_SRC.match(/id="assistant-consent-text"[\s\S]*?<\/p>/)[0].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+        assert(/conteúdo da tarefa selecionada/.test(consent) && /será enviado ao provedor externo de IA/.test(consent), 'envio ao provedor');
+        assert(/tarefas? de outro usuário/.test(consent) && /compartilhadas? com você/.test(consent), 'tarefa compartilhada');
+        assert(/indicador de atraso/.test(consent) && /calculado a partir do prazo e do estado/.test(consent), 'indicador de atraso');
+        for (const campo of ['título', 'descrição', 'estado', 'prioridade', 'prazo', 'categoria', 'papel na tarefa']) {
+            assert(consent.includes(campo), `campo enviado ausente do consentimento: ${campo}`);
+        }
+        assert(/Evite incluir informações pessoais ou confidenciais\./.test(consent));
         assert(/askAiAboutTask\(\)[^<]*>[\s\S]{0,60}Perguntar à IA/.test(SCRIPT_SRC), 'botão no painel de detalhes');
         const vercel = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'vercel.json'), 'utf8'));
         const api = vercel.routes.find(r => r.dest === 'backend/wsgi.py').src;

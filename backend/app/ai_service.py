@@ -63,6 +63,7 @@ _ERRORS = {
     'ai_timeout':        ('O provedor de IA demorou demasiado a responder. Tente novamente.', 504),
     'ai_unavailable':    ('O provedor de IA está indisponível neste momento. Tente novamente.', 502),
     'ai_bad_response':   ('O provedor de IA devolveu uma resposta inválida. Tente novamente.', 502),
+    'ai_truncated':      ('O modelo atingiu o limite de saída antes de concluir a resposta. Tente uma pergunta mais curta ou avise o administrador.', 502),
 }
 
 
@@ -242,5 +243,9 @@ def _extract_reply(raw):
     message = choice.get('message')
     content = message.get('content') if isinstance(message, dict) else None
     if not isinstance(content, str) or not content.strip():
+        # Modelos de raciocínio podem gastar todo o limite de saída em raciocínio e devolver `content`
+        # vazio com finish_reason "length". O campo `reasoning` nunca é lido nem repassado.
+        if choice.get('finish_reason') == 'length':
+            raise _err('ai_truncated')
         raise _err('ai_bad_response')
     return content.strip()[:MAX_REPLY_CHARS]

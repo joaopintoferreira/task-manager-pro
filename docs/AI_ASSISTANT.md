@@ -101,9 +101,12 @@ Uma chamada real ao provedor só acontece quando você configura a sua chave e u
 - Ao provedor seguem **apenas**: título, descrição (até 1500 caracteres), estado, prioridade, prazo, indicador de atraso,
   nome da categoria e o seu papel na tarefa. **Nunca** emails, colaboradores, IDs de outros usuários, notificações, outras
   tarefas, tokens ou credenciais.
-- Antes de ativar o contexto a tela exige consentimento: *"O conteúdo desta tarefa será enviado ao provedor externo de IA
-  para gerar uma resposta. Evite incluir informações pessoais ou confidenciais."* O aceite vale só para a sessão da tela
-  (não é guardado) e é pedido de novo depois de **Limpar conversa**.
+- Antes de ativar o contexto a tela exige consentimento: *"Ao aceitar, o conteúdo da tarefa selecionada (título, descrição,
+  estado, prioridade, prazo, categoria, o seu papel na tarefa e o indicador de atraso, que é calculado a partir do prazo e
+  do estado) será enviado ao provedor externo de IA para gerar uma resposta. Isto inclui tarefas de outro usuário que foram compartilhadas com você. Evite incluir informações pessoais ou
+  confidenciais."* O aceite vale só para a sessão da tela (não é guardado) e é pedido de novo depois de **Limpar conversa**.
+  O consentimento é uma proteção da interface; as permissões não mudaram: continua a valer só o acesso à tarefa verificado
+  pelo backend.
 - As mensagens que você digita **também** são enviadas ao provedor. O histórico enviado é limitado (10 mensagens,
   2000 caracteres cada, 8000 no total).
 - Os textos da tarefa e das mensagens são tratados como **dados, não instruções**: ficam delimitados no prompt e o
@@ -136,9 +139,41 @@ separado, então é uma proteção básica contra abuso, não um teto rígido.
 | "O limite de uso do provedor… (quota ou saldo)" | `ai_quota` | Quota/limites da conta (HTTP 429/402 do provedor). Aguarde ou escolha outro modelo — o sistema **não** troca sozinho |
 | "O assistente demorou demasiado…" | `ai_timeout` | Aumente `AI_TIMEOUT_SECONDS` ou tente de novo |
 | "O serviço de IA está indisponível…" | `ai_unavailable` | Falha de rede/DNS/5xx do provedor |
+| "O modelo atingiu o limite de saída antes de concluir a resposta…" | `ai_truncated` | O modelo parou por `finish_reason: length` sem texto (veja [Modelos de raciocínio](#modelos-de-raciocínio-openaigpt-oss-20b)) |
 | "Enviou mensagens demasiado depressa…" | HTTP 429 do app | Limite de 10 por minuto |
 
 Os detalhes técnicos nunca vão para a interface. Para diagnosticar, veja os logs do backend (`ai_chat user=… provider=… status=… error=…`).
+
+## Modelos de raciocínio (`openai/gpt-oss-20b`)
+
+O que a documentação oficial da Groq ([Reasoning](https://console.groq.com/docs/reasoning), consultada em 2026-10-29) confirma
+para os modelos `openai/gpt-oss-*`:
+
+- aceitam `reasoning_effort` com os valores `low`, `medium` e `high` e `include_reasoning` (verdadeiro por omissão);
+- `reasoning_format` **não** é suportado;
+- o raciocínio é devolvido num campo separado, `message.reasoning`.
+
+A página **não diz** se os tokens de raciocínio contam para `max_completion_tokens`. Por prudência, assuma que podem contar:
+com `AI_MAX_TOKENS=600`, uma pergunta complexa pode esgotar o limite antes de produzir texto.
+
+Como o sistema se comporta:
+
+- Resposta com texto, mesmo cortada por `length`: o texto recebido é mostrado.
+- `content` vazio com `finish_reason: length`: erro `ai_truncated` (HTTP 502) com mensagem própria. Tente uma pergunta mais curta ou
+  peça ao administrador para rever `AI_MAX_TOKENS`.
+- `content` vazio por qualquer outra razão: `ai_bad_response`.
+- O campo `reasoning` **nunca** é lido, registado nem enviado ao navegador.
+- O sistema **não** envia `reasoning_effort` nem `include_reasoning` e **não** aumenta `AI_MAX_TOKENS` sozinho: o comportamento
+  dos outros modelos e provedores não mudou.
+
+Se o `ai_truncated` for frequente, as opções são subir `AI_MAX_TOKENS` (até 2000; mais tokens = mais quota e mais latência,
+mantendo o timeout em mente) ou enviar `reasoning_effort: low`. A segunda exige uma nova variável de configuração e
+**ainda não foi implementada**, por ser uma decisão de arquitetura pendente de aprovação.
+
+Quotas: os limites do plano gratuito **não foram confirmados** aqui. A página oficial de limites mostra apenas o plano
+*Developer* (para `openai/gpt-oss-20b`: 30 RPM, 1K RPD, 8K TPM e 200K TPD) e informa que os limites são por organização.
+Confirme os seus em *Settings → Limits* no console. Com um histórico grande, um único pedido pode consumir uma parte
+relevante de um limite de tokens por minuto, e o excesso aparece como `ai_quota`.
 
 ## Vercel
 
@@ -147,6 +182,20 @@ Os detalhes técnicos nunca vão para a interface. Para diagnosticar, veja os lo
   plano Hobby é de 300 s (Pro: padrão 300 s, máximo 800 s), então o timeout de 20 s cabe. Este projeto usa a configuração
   antiga `builds` do `vercel.json`; confirme no painel (*Settings → Functions*) o limite efetivo do seu projeto. Se for
   preciso ajustá-lo, é uma mudança de configuração do deploy, a fazer numa etapa própria.
+
+### Rate limit e IP real (pendente)
+
+O limite de `/ai/chat` usa `flask_limiter.util.get_remote_address`, isto é, `request.remote_addr`. O código **não** usa
+`ProxyFix` nem lê `X-Forwarded-For`. Segundo a [documentação da Vercel](https://vercel.com/docs/headers/request-headers), a
+Vercel envia o IP público do cliente em `x-forwarded-for` (e em `x-real-ip` / `x-vercel-forwarded-for`), **sobrescreve**
+o `X-Forwarded-For` enviado pelo cliente para evitar falsificação, e só aceita um IP personalizado no plano Enterprise com
+*trusted proxy*. A documentação não diz o que o runtime `@vercel/python` coloca em `request.remote_addr`.
+
+Por isso **não foi feita nenhuma alteração**: configurar `ProxyFix` sem saber quantos proxies existem à frente do Flask, ou
+confiar em `X-Forwarded-For` sem essa garantia, permitiria que um cliente falsificasse o IP e fugisse ao limite (ou, no
+sentido inverso, que todos partilhassem o mesmo contador). Para resolver numa etapa própria é preciso medir no ambiente real:
+num deploy de *preview*, registe só `request.remote_addr` e o número de entradas de `X-Forwarded-For` (nunca os valores
+completos nem outros cabeçalhos) e confirme se `remote_addr` é o IP do cliente ou o de um proxy.
 
 ## Limitações conhecidas
 

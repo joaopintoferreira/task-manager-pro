@@ -22,6 +22,7 @@ MAX_MESSAGE_CHARS = 2000   # por mensagem
 MAX_TOTAL_CHARS = 8000     # histórico inteiro
 MAX_DESCRIPTION_CHARS = 1500   # descrição da tarefa enviada como contexto
 MAX_TITLE_CHARS = 200
+MAX_TASK_ID = 2 ** 31 - 1   # coluna INTEGER: acima disto a consulta falharia (erro 500) em vez de dar 404
 ALLOWED_ROLES = {'user', 'assistant'}   # `system` nunca vem do cliente
 
 
@@ -94,7 +95,8 @@ def chat(current_user):
         return error
 
     task_id = data.get('task_id')
-    if task_id is not None and (isinstance(task_id, bool) or not isinstance(task_id, int) or task_id < 1):
+    if task_id is not None and (isinstance(task_id, bool) or not isinstance(task_id, int)
+                             or not 1 <= task_id <= MAX_TASK_ID):
         return _invalid('Tarefa inválida.')
 
     try:

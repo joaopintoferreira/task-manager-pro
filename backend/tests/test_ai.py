@@ -178,6 +178,32 @@ class TestValidation(AITestCase):
         for bad in ('1', True, 0, -3, 1.5, [1], {}):
             self.assert_invalid({'messages': [{'role': 'user', 'content': 'oi'}], 'task_id': bad})
 
+    def test_decimal_numeric_text_and_odd_task_ids_are_invalid(self):
+        for bad in (1.0, 2.0, '1.0', '1', '01', ' 1', '', 'abc', '1; DROP TABLE tasks', False):
+            self.assert_invalid({'messages': [{'role': 'user', 'content': 'oi'}], 'task_id': bad})
+        self.assertEqual(len(self.net.calls), 0)
+
+    def test_out_of_range_task_id_is_a_clean_400_not_a_crash(self):
+        for huge in (2 ** 31, 2 ** 63, 10 ** 30):
+            self.assert_invalid({'messages': [{'role': 'user', 'content': 'oi'}], 'task_id': huge})
+        self.assertEqual(len(self.net.calls), 0)
+
+    def test_null_task_id_means_no_context(self):
+        self.net.reply()
+        self.assertEqual(self.chat(task_id=None).status_code, 200)
+        self.assertNotIn('Contexto da tarefa selecionada', self.net.last_body['messages'][0]['content'])
+
+
+class TestAuthorizationHeader(AITestCase):
+    def test_empty_or_malformed_bearer_is_rejected_before_any_provider_call(self):
+        for value in ('Bearer', 'Bearer ', 'Bearer  ', 'bearer abc', 'Basic abc', 'Token abc', ''):
+            r = self.chat(headers={'Authorization': value})
+            self.assertEqual(r.status_code, 401, repr(value))
+            self.assertNotIn('reply', r.get_json())
+        r = self.chat(headers={})
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(len(self.net.calls), 0)
+
 
 class TestConfiguration(AITestCase):
     def assert_not_configured(self):
@@ -343,6 +369,53 @@ class TestProviderResponses(AITestCase):
             self.assertEqual((r.status_code, r.get_json()['code']), (502, 'ai_bad_response'), raw)
         self.net.behavior = FakeResponse(b'x' * (ai_service.MAX_RESPONSE_BYTES + 10))
         self.assertEqual(self.chat().get_json()['code'], 'ai_bad_response')
+
+    def provider_choice(self, content, finish_reason, **message_extra):
+        message = {'role': 'assistant', 'content': content, **message_extra}
+        self.net.behavior = FakeResponse(json.dumps(
+            {'choices': [{'message': message, 'finish_reason': finish_reason}]}).encode())
+
+    def test_length_with_empty_content_is_a_specific_stable_error(self):
+        for content in ('', '   ', None):
+            self.provider_choice(content, 'length')
+            self.assert_error('length', 'ai_truncated', 502)
+        # o campo `reasoning` nunca é repassado, mesmo quando o conteúdo vem vazio
+        self.provider_choice('', 'length', reasoning='RACIOCINIO-INTERNO-5e8a')
+        r = self.chat()
+        self.assertEqual((r.status_code, r.get_json()['code']), (502, 'ai_truncated'))
+        self.assertNotIn('RACIOCINIO-INTERNO-5e8a', r.get_data(as_text=True))
+
+    def test_length_without_content_key_is_also_truncated(self):
+        self.net.behavior = FakeResponse(json.dumps(
+            {'choices': [{'message': {'role': 'assistant', 'reasoning': 'x'}, 'finish_reason': 'length'}]}).encode())
+        self.assertEqual(self.chat().get_json()['code'], 'ai_truncated')
+
+    def test_empty_content_with_other_finish_reason_stays_bad_response(self):
+        for reason in ('stop', None, 'content_filter'):
+            self.provider_choice('', reason)
+            self.assert_error(reason, 'ai_bad_response', 502)
+
+    def test_partial_content_with_length_is_still_returned(self):
+        self.provider_choice('Resposta cortada no meio', 'length')
+        r = self.chat()
+        self.assertEqual((r.status_code, r.get_json()['reply']), (200, 'Resposta cortada no meio'))
+
+    def test_reasoning_field_is_ignored_and_never_returned(self):
+        self.provider_choice('Resposta final.', 'stop', reasoning='RACIOCINIO-INTERNO-5e8a')
+        r = self.chat()
+        self.assertEqual(r.get_json(), {'reply': 'Resposta final.', 'context': None})
+        self.assertNotIn('RACIOCINIO-INTERNO-5e8a', r.get_data(as_text=True))
+
+    def test_reasoning_only_without_content_is_an_error_not_a_reply(self):
+        self.provider_choice(None, 'stop', reasoning='RACIOCINIO-INTERNO-5e8a')
+        r = self.chat()
+        self.assertEqual((r.status_code, r.get_json()['code']), (502, 'ai_bad_response'))
+        self.assertNotIn('RACIOCINIO-INTERNO-5e8a', r.get_data(as_text=True))
+
+    def test_no_reasoning_parameters_are_sent(self):
+        self.net.reply()
+        self.chat()
+        self.assertTrue({'reasoning_effort', 'include_reasoning', 'reasoning_format', 'reasoning'}.isdisjoint(self.net.last_body))
 
     def test_error_object_inside_a_200_response(self):
         self.net.behavior = FakeResponse(json.dumps({'error': {'code': 429, 'message': 'limite detalhado'}}).encode())

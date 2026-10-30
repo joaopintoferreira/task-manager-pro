@@ -142,7 +142,7 @@ O assistente de IA usa variáveis próprias (`AI_PROVIDER`, `AI_API_KEY`, `AI_MO
 ## Deploy na Vercel
 
 O `vercel.json` publica `backend/wsgi.py` (Flask, via `@vercel/python`) e `frontend/**` (estático); as rotas
-`/auth`, `/tasks`, `/categories` e `/notifications` vão para o Flask e `/` abre `auth.html`.
+`/auth`, `/tasks`, `/categories`, `/notifications` e `/ai` (`POST /ai/chat`, assistente de IA) vão para o Flask e `/` abre `auth.html`.
 
 1. Importe o repositório na Vercel.
 2. Em **Settings > Environment Variables** defina `DATABASE_URL` (string **pooled** do Neon) e `SECRET_KEY`
@@ -153,6 +153,7 @@ O `vercel.json` publica `backend/wsgi.py` (Flask, via `@vercel/python`) e `front
 ### Limitações conhecidas
 
 - O rate limiting usa memória por instância: em serverless o contador não é global nem compartilhado.
+- O limite é por IP (`request.remote_addr`). Ainda **não foi verificado** qual IP o Flask recebe atrás da Vercel; veja "Rate limit e IP real" em [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md).
 - Os limites padrão (50 requisições/hora e 200/dia por IP em todas as rotas) são baixos para uso intenso do dashboard.
 - Refresh tokens são de uso único; usar a mesma sessão em várias abas ao mesmo tempo pode forçar um novo login.
 - `api/index.py` não é usado (o `vercel.json` define `builds`, o que desativa a detecção automática de `api/`).

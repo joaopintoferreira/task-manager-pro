@@ -57,6 +57,7 @@ function assistantErrorInfo(status, code) {
         ai_timeout:        'O assistente demorou demasiado a responder. Tente novamente.',
         ai_unavailable:    'O serviço de IA está indisponível neste momento. Tente novamente em instantes.',
         ai_bad_response:   'O serviço de IA devolveu uma resposta inválida. Tente novamente.',
+        ai_truncated:      'O modelo atingiu o limite de saída antes de concluir a resposta. Tente uma pergunta mais curta ou avise o administrador.',
         invalid_request:   'Não foi possível enviar esta mensagem. Verifique o tamanho e tente novamente.',
     };
     if (code === 'task_not_found') {
