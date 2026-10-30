@@ -241,6 +241,25 @@ class TestTasks(ApiTestCase):
         r = self.client.get('/tasks?page=abc&per_page=xx&category_id=zz', headers=h)
         self.assertEqual(r.status_code, 200)
 
+    def test_pagination_with_more_than_twenty_tasks(self):
+        h = self.user('a@example.com')
+        other = self.user('b@example.com')
+        for i in range(45):
+            self.assertEqual(self.client.post('/tasks', headers=h, json={'title': f'T{i:02d}'}).status_code, 201)
+        self.client.post('/tasks', headers=other, json={'title': 'de outro usuário'})
+        pages = [self.client.get(f'/tasks?page={n}&sort_by=title&order=asc', headers=h).get_json() for n in (1, 2, 3)]
+        self.assertEqual([len(p['tasks']) for p in pages], [20, 20, 5])            # per_page padrão = 20
+        self.assertTrue(all(p['total'] == 45 and p['total_pages'] == 3 and p['per_page'] == 20 for p in pages))
+        self.assertEqual([(p['has_prev'], p['has_next']) for p in pages], [(False, True), (True, True), (True, False)])
+        titles = [t['title'] for p in pages for t in p['tasks']]
+        self.assertEqual(titles, sorted(titles))
+        self.assertEqual(len(set(titles)), 45)                                      # sem repetidos nem tarefas alheias
+        beyond = self.client.get('/tasks?page=4', headers=h)
+        self.assertEqual((beyond.status_code, beyond.get_json()['tasks']), (200, []))
+        # o total filtrado é independente do total geral
+        self.assertEqual(self.client.get('/tasks?search=T4', headers=h).get_json()['total'], 5)   # T40..T44
+        self.assertEqual(self.client.get('/tasks/stats', headers=h).get_json()['total'], 45)
+
     def test_sort_by_priority_uses_business_order(self):
         h = self.user('a@example.com')
         for p in ['low', 'high', 'medium', 'low', 'high']:

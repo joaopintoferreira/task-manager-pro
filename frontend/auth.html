@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Entrar | Task Manager</title>
+    <script>
+        // Tema guardado ('theme' no localStorage, igual ao index.html); aplicado antes de pintar para evitar flash
+        (function () {
+            var t = 'light';
+            try { if (localStorage.getItem('theme') === 'dark') t = 'dark'; } catch (e) {}
+            document.documentElement.setAttribute('data-theme', t);
+            document.documentElement.setAttribute('data-bs-theme', t);
+        })();
+    </script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -140,9 +149,45 @@
         }
         .password-wrap { position: relative; }
         .password-wrap .form-control { padding-right: 42px; }
+
+        /* Botão de tema */
+        .theme-toggle {
+            position: fixed; top: 16px; right: 16px;
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 1px solid rgba(255,255,255,.35);
+            background: rgba(255,255,255,.18); color: #fff;
+            display: inline-flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background .2s;
+        }
+        .theme-toggle:hover { background: rgba(255,255,255,.3); }
+        .theme-toggle:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+        .theme-toggle .bi-sun-fill { display: none; }
+        [data-theme="dark"] .theme-toggle .bi-sun-fill  { display: inline; }
+        [data-theme="dark"] .theme-toggle .bi-moon-stars-fill { display: none; }
+
+        /* ── Tema escuro (os componentes do Bootstrap seguem data-bs-theme) ── */
+        [data-theme="dark"] { --primary: #7c80e8; --primary-dark: #4b3a73; }
+        [data-theme="dark"] body { background: linear-gradient(135deg, #1b1d2e 0%, #2a2140 100%); }
+        [data-theme="dark"] .auth-card { background: #16171a; box-shadow: 0 20px 60px rgba(0,0,0,.55); }
+        [data-theme="dark"] .auth-tabs { border-bottom-color: #26272c; }
+        [data-theme="dark"] .auth-tab { color: #9a9da6; }
+        [data-theme="dark"] .auth-tab.active { color: #9094f0; border-bottom-color: #9094f0; background: #1b1c20; }
+        [data-theme="dark"] .form-label { color: #c9cbd1; }
+        [data-theme="dark"] .form-control,
+        [data-theme="dark"] .form-select { background-color: #1b1c20; border-color: #34363c; color: #ececee; }
+        [data-theme="dark"] .form-control::placeholder { color: #6d7079; }
+        [data-theme="dark"] .form-control:focus { border-color: #9094f0; box-shadow: 0 0 0 3px rgba(144,148,240,.25); }
+        [data-theme="dark"] .input-group .input-group-text { background: #1b1c20; border-color: #34363c; color: #9a9da6; }
+        [data-theme="dark"] .toggle-password { color: #9a9da6; }
+        [data-theme="dark"] .strength-bar { background: #26272c; }
+        [data-theme="dark"] .alert-danger  { background: #2a1517; border-color: #5c2a2f; color: #f5a3a3; }
+        [data-theme="dark"] .alert-success { background: #12261a; border-color: #1f4d30; color: #8fe0aa; }
     </style>
 </head>
 <body>
+<button type="button" class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-pressed="false" aria-label="Mudar para tema escuro" title="Mudar para tema escuro">
+    <i class="bi bi-moon-stars-fill" aria-hidden="true"></i><i class="bi bi-sun-fill" aria-hidden="true"></i>
+</button>
 <div class="auth-wrapper">
     <div class="auth-logo">
         <i class="bi bi-check2-circle"></i>
@@ -231,6 +276,25 @@
 const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:5000'
     : '';
+
+// ── Tema ─────────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+    const t = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    document.documentElement.setAttribute('data-bs-theme', t);
+    const btn = document.getElementById('theme-toggle');
+    const label = t === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro';
+    btn.setAttribute('aria-pressed', String(t === 'dark'));
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+}
+function toggleTheme() {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('theme', next); } catch (e) { /* armazenamento indisponível */ }
+    applyTheme(next);
+}
+applyTheme(document.documentElement.getAttribute('data-theme'));
+window.addEventListener('storage', e => { if (e.key === 'theme') applyTheme(e.newValue); });
 
 // ── Tab ──────────────────────────────────────────────────────────────────
 function showTab(tab) {

@@ -42,13 +42,20 @@ let notifOpen   = false;
 // ══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', init);
 
+// Página de login. Na Vercel, `/auth.html` casaria com a rota `/(auth|…)(.*)` e iria para o Flask (404);
+// lá o login é servido em `/`. Em localhost `/` serve o index.html (gera um loop), então usa auth.html.
+function loginPageUrl() {
+    const h = window.location.hostname;
+    return (h === 'localhost' || h === '127.0.0.1') ? 'auth.html' : '/';
+}
+
 function init() {
     accessToken  = localStorage.getItem('access_token');
     refreshToken = localStorage.getItem('refresh_token');
     const userData = localStorage.getItem('user');
 
     if (!accessToken || !userData) {
-        window.location.href = 'auth.html';
+        window.location.href = loginPageUrl();
         return;
     }
 
@@ -343,8 +350,14 @@ function renderPagination(data) {
     document.getElementById('btn-next').disabled = !data.has_next;
 }
 
+function hasActiveFilters() {
+    return state.filter !== 'all' || !!state.priority || !!state.category || !!state.search;
+}
+
 function updateNavCounts(data) {
-    // Atualiza os contadores da sidebar com os dados paginados
+    // "Todas" mostra o total geral (vem de /tasks/stats). Com filtros ativos, `data.total` é só o total
+    // filtrado e não pode substituí-lo.
+    if (hasActiveFilters()) return;
     document.getElementById('cnt-all').textContent = data.total ?? '';
 }
 
@@ -1662,7 +1675,7 @@ async function doLogout() {
         });
     } catch { /* segue */ }
     localStorage.clear();
-    window.location.href = '/';
+    window.location.href = loginPageUrl();
 }
 
 // ══════════════════════════════════════════════

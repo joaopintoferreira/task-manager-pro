@@ -250,5 +250,49 @@ async function test(name, fn) { await fn(); passed++; console.log('ok -', name);
         assert.strictEqual(c.ownerName(undefined), '');
     });
 
+    // Contador "Todas" da sidebar: com filtros, o total filtrado não o substitui
+    const navCtx = (st, loadedTotal = '45') => {
+        const cnt = { textContent: loadedTotal };
+        const ctx = { state: Object.assign({ filter: 'all', priority: '', category: '', search: '' }, st),
+                      document: { getElementById: id => { assert.strictEqual(id, 'cnt-all'); return cnt; } } };
+        vm.createContext(ctx);
+        vm.runInContext(slice('function hasActiveFilters', '// ══════════════════════════════════════════════\n// STATS'), ctx);
+        return { ctx, cnt };
+    };
+    await test('contador «Todas»: sem filtros mostra o total; com qualquer filtro mantém o total geral', async () => {
+        const free = navCtx({});
+        free.ctx.updateNavCounts({ total: 7 });
+        assert.strictEqual(free.cnt.textContent, 7);
+        for (const st of [{ filter: 'pending' }, { priority: 'high' }, { category: '3' }, { search: 'x' }]) {
+            const c = navCtx(st);
+            c.ctx.updateNavCounts({ total: 2 });
+            assert.strictEqual(c.cnt.textContent, '45', JSON.stringify(st));
+        }
+    });
+
+    // Página de login: `/auth.html` iria para o Flask na Vercel; em localhost `/` geraria um loop
+    await test('página de login: «/» na Vercel e auth.html em localhost', async () => {
+        const url = hostname => {
+            const ctx = { window: { location: { hostname } } };
+            vm.createContext(ctx);
+            vm.runInContext(slice('function loginPageUrl', 'function init'), ctx);
+            return ctx.loginPageUrl();
+        };
+        assert.strictEqual(url('task-manager.vercel.app'), '/');
+        assert.strictEqual(url('localhost'), 'auth.html');
+        assert.strictEqual(url('127.0.0.1'), 'auth.html');
+        assert(!/location\.href\s*=\s*'auth\.html'/.test(src), 'sem redirecionamento direto para auth.html');
+    });
+
+    await test('auth.html: tema escuro aplicado antes de pintar, com a mesma chave do app e botão acessível', async () => {
+        const html = fs.readFileSync(path.join(__dirname, '..', 'auth.html'), 'utf8');
+        assert(/localStorage\.getItem\('theme'\) === 'dark'/.test(html), 'lê a chave "theme"');
+        assert(html.indexOf("setAttribute('data-theme'") < html.indexOf('</head>'), 'aplicado no <head>');
+        assert(/setAttribute\('data-bs-theme'/.test(html));
+        assert(/\[data-theme="dark"\] \.auth-card/.test(html) && /\[data-theme="dark"\] \.form-control/.test(html));
+        assert(/id="theme-toggle"[^>]*aria-label=/.test(html) && /aria-pressed=/.test(html));
+        assert(/localStorage\.setItem\('theme'/.test(html));
+    });
+
     console.log(`\n${passed} testes de api/frontend passaram`);
 })().catch(e => { console.error('FALHOU:', e.message); process.exit(1); });
