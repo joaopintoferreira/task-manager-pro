@@ -847,8 +847,9 @@ class TestConfigAndDeploy(unittest.TestCase):
         self.assertIn('backend/wsgi.py', srcs)
         self.assertTrue((ROOT / 'backend/wsgi.py').exists())
         self.assertIn('app = create_app()', (ROOT / 'backend/wsgi.py').read_text())
-        api_route = next(r for r in cfg['routes'] if r['dest'] == 'backend/wsgi.py')
-        for path in ('/auth/login', '/tasks', '/tasks/1', '/categories', '/notifications/read-all'):
+        api_route = next(r for r in cfg['routes'] if r.get('dest') == 'backend/wsgi.py')
+        for path in ('/auth/login', '/tasks', '/tasks/1', '/categories', '/notifications/read-all', '/ai/chat',
+                     '/admin/users', '/admin/audit'):
             self.assertTrue(re.match(api_route['src'] + '$', path), path)
         for page in ('frontend/auth.html', 'frontend/index.html', 'frontend/script.js', 'frontend/style.css'):
             self.assertTrue((ROOT / page).exists(), page)
@@ -896,7 +897,7 @@ class TestMigrations(unittest.TestCase):
                 tables = set(db.inspect(db.engine).get_table_names())
                 self.assertEqual(tables, {'users', 'categories', 'refresh_tokens', 'tasks',
                                           'notifications', 'task_collaborators', 'user_avatars',
-                                          'alembic_version'})
+                                          'admin_audit_log', 'alembic_version'})
                 with db.engine.connect() as conn:
                     diff = compare_metadata(MigrationContext.configure(conn), db.metadata)
                 self.assertEqual(diff, [], f'Modelos e migrações divergem: {diff}')

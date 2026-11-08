@@ -73,12 +73,26 @@ def create_app(config_class=None):
     from backend.app.routes.categories import categories_bp
     from backend.app.routes.notifications import notifications_bp
     from backend.app.routes.ai import ai_bp
+    from backend.app.routes.admin import admin_bp
 
     app.register_blueprint(auth_bp,          url_prefix='/auth')
     app.register_blueprint(tasks_bp,         url_prefix='/tasks')
     app.register_blueprint(categories_bp,    url_prefix='/categories')
     app.register_blueprint(notifications_bp, url_prefix='/notifications')
     app.register_blueprint(ai_bp,            url_prefix='/ai')
+    app.register_blueprint(admin_bp,         url_prefix='/admin')
+
+    from backend.app.cli import register_cli
+    register_cli(app)
+
+    # ── Cabeçalhos de segurança das respostas da API ──
+    @app.after_request
+    def security_headers(response):
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('Referrer-Policy', 'no-referrer')
+        if request.path.startswith(('/admin', '/auth')):
+            response.headers.setdefault('Cache-Control', 'no-store')      # dados administrativos/sessões nunca em cache
+        return response
 
     # ── Rota raiz ─────────────────────────────
     @app.route('/')

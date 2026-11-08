@@ -23,6 +23,8 @@ Aplicação de gerenciamento de tarefas com autenticação JWT, categorias, noti
 - Colaboração entre usuários em tarefas
 - Dashboard com estatísticas
 - Assistente de IA (Groq ou OpenRouter), opcional e configurável — veja [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md)
+- Painel administrativo (papéis `user`/`admin`/`superadmin`, auditoria, limpeza e exclusão de utilizadores, limpeza global protegida) — veja [docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md)
+- Perfil do utilizador: nome, email, senha e foto
 - Rate limiting e validação de senha
 - Interface responsiva
 
@@ -63,10 +65,10 @@ export FLASK_APP=backend.wsgi
 # string DIRETA só para este comando (não precisa alterar o .env):
 DATABASE_URL='postgresql://USUARIO:SENHA@ep-xxxx.REGIAO.aws.neon.tech/NOME_DO_BANCO?sslmode=require' \
   flask db upgrade -d backend/migrations
-flask db current -d backend/migrations      # deve mostrar 9ee9fe5f43cf (head)
+flask db current -d backend/migrations      # deve mostrar c4d7a1e08b52 (head)
 ```
 
-Isso cria `users`, `categories`, `refresh_tokens`, `tasks`, `notifications`, `task_collaborators` e `user_avatars` (duas migrações: `5e59e9ffa61a` e `9ee9fe5f43cf`). O banco começa vazio:
+Isso cria `users`, `categories`, `refresh_tokens`, `tasks`, `notifications`, `task_collaborators`, `user_avatars` e `admin_audit_log` (três migrações: `5e59e9ffa61a`, `9ee9fe5f43cf` e `c4d7a1e08b52`, esta última com o papel dos utilizadores e a auditoria; é aditiva e **deve ser aplicada antes de publicar o código que a usa**, veja [docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md)). O banco começa vazio:
 cadastre o primeiro usuário pela tela de cadastro. As migrações ficam em `backend/migrations/versions/` e são versionadas no Git.
 Nunca use `flask db stamp` para "pular" a criação das tabelas.
 
@@ -91,6 +93,8 @@ python -m unittest backend.tests.test_api -v     # backend
 node frontend/tests/time.test.js                 # helpers de data/hora do frontend
 python -m unittest backend.tests.test_ai -v      # assistente de IA (chamadas ao provedor simuladas)
 node frontend/tests/assistant.test.js            # tela do assistente de IA
+python -m unittest backend.tests.test_admin -v   # painel administrativo, papéis, auditoria, perfil
+node frontend/tests/admin.test.js                # painel administrativo (frontend), SRI, cabeçalhos
 ```
 
 Os testes usam SQLite temporário e **não** acessam o NeonDB. Cobrem autenticação (jti, rotação e revogação de refresh tokens),
@@ -136,18 +140,21 @@ Template completo em `backend/.env.example`.
 | `CORS_ORIGINS` | não | Origens permitidas, separadas por vírgula (só se o frontend estiver em outro domínio) |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | não | Pool por instância (padrão 2 / 0) |
 
+O painel administrativo usa `ADMIN_ALLOW_GLOBAL_WIPE` (opcional, **desligada por omissão**): só com `true` o backend aceita a
+limpeza global de dados. Veja [docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md).
+
 O assistente de IA usa variáveis próprias (`AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, `AI_TIMEOUT_SECONDS`,
 `AI_MAX_TOKENS`), todas opcionais: sem elas o recurso fica desativado. Detalhes em [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md).
 
 ## Deploy na Vercel
 
 O `vercel.json` publica `backend/wsgi.py` (Flask, via `@vercel/python`) e `frontend/**` (estático); as rotas
-`/auth`, `/tasks`, `/categories`, `/notifications` e `/ai` (`POST /ai/chat`, assistente de IA) vão para o Flask e `/` abre `auth.html`.
+`/auth`, `/tasks`, `/categories`, `/notifications`, `/ai` (`POST /ai/chat`, assistente de IA) e `/admin` (painel administrativo) vão para o Flask e `/` abre `auth.html`. O mesmo `vercel.json` aplica cabeçalhos de segurança a todas as respostas. Os ficheiros estáticos do frontend **não** podem ter nomes que comecem por esses prefixos.
 
 1. Importe o repositório na Vercel.
 2. Em **Settings > Environment Variables** defina `DATABASE_URL` (string **pooled** do Neon) e `SECRET_KEY`
    (e `CORS_ORIGINS` apenas se necessário). Sem `DATABASE_URL` PostgreSQL a aplicação falha com uma mensagem clara.
-3. Aplique as migrações no Neon **antes** do primeiro uso (comandos acima, a partir da sua máquina).
+3. Aplique as migrações no Neon **antes** do primeiro uso (comandos acima, a partir da sua máquina) e, para o painel administrativo, **antes de publicar o código novo** (ele lê `users.role` em todos os pedidos). A sequência completa está em [docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md).
 4. Faça o deploy e teste `/`, cadastro e login.
 
 ### Limitações conhecidas

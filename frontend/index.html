@@ -13,9 +13,11 @@
             document.documentElement.setAttribute('data-bs-theme', t);
         })();
     </script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="style.css?v=11" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"
+          integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
+    <link href="style.css?v=12" rel="stylesheet">
     <link href="assistant.css?v=2" rel="stylesheet">
 </head>
 <body>
@@ -63,6 +65,11 @@
 
         <a class="nav-link" href="#" data-view="assistant" onclick="showView('assistant'); return false;">
             <i class="bi bi-stars"></i> Assistente de IA
+        </a>
+
+        <!-- Só aparece para ADMIN/SUPERADMIN (cosmético: o backend autoriza cada rota /admin) -->
+        <a class="nav-link" href="#" id="nav-admin" data-view="admin" hidden onclick="showView('admin'); return false;">
+            <i class="bi bi-shield-lock"></i> Administração
         </a>
 
         <div class="nav-section-label">Tarefas</div>
@@ -357,6 +364,11 @@
             <p class="assistant-foot">As respostas são geradas por IA e podem conter erros: confirme o que for importante. A conversa não é guardada. Enter envia; Shift+Enter quebra a linha.</p>
         </div>
     </div>
+
+    <!-- ═══ Vista: Administração (conteúdo criado por painel-adm.js, só para ADMIN/SUPERADMIN) ═══ -->
+    <div class="view" id="admin-view" hidden>
+        <div class="admin-panel" id="admin-root"></div>
+    </div>
 </div>
 
 <!-- ══════════════════════════════════════════════
@@ -503,23 +515,75 @@
      MODAL — PERFIL
 ══════════════════════════════════════════════ -->
 <div class="modal fade" id="profileModal" tabindex="-1" aria-labelledby="profileModalLabel">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="profileModalLabel">Meu perfil</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
-            <div class="modal-body text-center">
-                <div class="user-avatar profile-avatar" id="profile-avatar">?</div>
-                <div class="fw-semibold mt-2" id="profile-name"></div>
-                <div class="text-muted small mb-3" id="profile-email"></div>
+            <div class="modal-body">
+                <section class="text-center" aria-label="Foto de perfil">
+                    <div class="user-avatar profile-avatar" id="profile-avatar">?</div>
+                    <div class="fw-semibold mt-2" id="profile-name"></div>
+                    <div class="text-muted small mb-3" id="profile-email"></div>
 
-                <input type="file" id="avatar-input" class="d-none"
-                       accept="image/png,image/jpeg,image/webp,image/gif" onchange="onAvatarPicked(this)">
-                <button class="btn btn-outline-primary btn-sm" onclick="document.getElementById('avatar-input').click()">
-                    <i class="bi bi-image me-1"></i> Escolher foto
-                </button>
-                <div class="form-text mt-2">PNG, JPEG, WebP ou GIF, até 5 MB.</div>
+                    <input type="file" id="avatar-input" class="d-none"
+                           accept="image/png,image/jpeg,image/webp,image/gif" onchange="onAvatarPicked(this)">
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="document.getElementById('avatar-input').click()">
+                            <i class="bi bi-image me-1"></i> Escolher foto
+                        </button>
+                        <button class="btn btn-primary btn-sm" id="avatar-save" onclick="saveAvatar()" disabled>
+                            <i class="bi bi-save me-1"></i> Salvar foto
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" id="avatar-remove" onclick="removeAvatar()" disabled>
+                            <i class="bi bi-trash me-1"></i> Remover
+                        </button>
+                    </div>
+                    <div class="form-text mt-2">PNG, JPEG, WebP ou GIF. A imagem é reduzida automaticamente.</div>
+                </section>
+
+                <form class="profile-section" id="profile-form" onsubmit="event.preventDefault(); saveProfile();" novalidate>
+                    <h6 class="profile-section-title">Dados da conta</h6>
+                    <div class="mb-2">
+                        <label class="form-label" for="profile-username">Nome de usuário</label>
+                        <input type="text" class="form-control" id="profile-username" maxlength="80" autocomplete="nickname">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="profile-email-input">Email</label>
+                        <input type="email" class="form-control" id="profile-email-input" maxlength="120" autocomplete="email"
+                               oninput="onProfileEmailInput()">
+                    </div>
+                    <div class="mb-2" id="profile-email-pw-wrap" hidden>
+                        <label class="form-label" for="profile-email-password">Senha atual (necessária para mudar o email)</label>
+                        <input type="password" class="form-control" id="profile-email-password" autocomplete="current-password">
+                    </div>
+                    <div class="profile-msg" id="profile-msg" role="status" aria-live="polite"></div>
+                    <button type="submit" class="btn btn-primary btn-sm" id="profile-save">
+                        <i class="bi bi-person-check me-1"></i> Salvar dados
+                    </button>
+                </form>
+
+                <form class="profile-section" id="password-form" onsubmit="event.preventDefault(); changePassword();" novalidate>
+                    <h6 class="profile-section-title">Alterar senha</h6>
+                    <div class="mb-2">
+                        <label class="form-label" for="pw-current">Senha atual</label>
+                        <input type="password" class="form-control" id="pw-current" autocomplete="current-password">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="pw-new">Nova senha</label>
+                        <input type="password" class="form-control" id="pw-new" autocomplete="new-password" maxlength="100">
+                        <div class="form-text">Mínimo 8 caracteres, com letra e número.</div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="pw-confirm">Confirmar nova senha</label>
+                        <input type="password" class="form-control" id="pw-confirm" autocomplete="new-password" maxlength="100">
+                    </div>
+                    <div class="profile-msg" id="password-msg" role="status" aria-live="polite"></div>
+                    <button type="submit" class="btn btn-primary btn-sm" id="password-save">
+                        <i class="bi bi-key me-1"></i> Alterar senha
+                    </button>
+                </form>
 
                 <div class="profile-logout">
                     <button type="button" class="btn btn-outline-danger btn-sm w-100" id="profile-logout" onclick="doLogout()">
@@ -528,12 +592,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline-danger me-auto" id="avatar-remove" onclick="removeAvatar()" disabled>
-                    <i class="bi bi-trash me-1"></i> Remover
-                </button>
-                <button class="btn btn-primary" id="avatar-save" onclick="saveAvatar()" disabled>
-                    <i class="bi bi-save me-1"></i> Salvar foto
-                </button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
     </div>
@@ -542,8 +601,9 @@
 <!-- Toast -->
 <div class="toast-wrap" id="toast-wrap"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="script.js?v=11"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+<script src="script.js?v=12"></script>
 <script src="assistant.js?v=2"></script>
 </body>
 </html>

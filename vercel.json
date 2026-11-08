@@ -12,15 +12,25 @@
   ],
   "routes": [
     {
-      "src": "/(auth|tasks|categories|notifications|ai)(.*)",
+      "src": "/(.*)",
+      "headers": {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        "Content-Security-Policy-Report-Only": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+      },
+      "continue": true
+    },
+    {
+      "src": "/(auth|tasks|categories|notifications|ai|admin)(.*)",
       "dest": "backend/wsgi.py"
     },
-
     {
       "src": "/",
       "dest": "frontend/auth.html"
     },
-
     {
       "src": "/(.*)",
       "dest": "frontend/$1"

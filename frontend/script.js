@@ -80,6 +80,48 @@ function init() {
     });
 }
 
+// ══════════════════════════════════════════════
+// ADMINISTRAÇÃO (acesso cosmético: o backend autoriza cada rota /admin e lê o papel da base a cada pedido)
+// ══════════════════════════════════════════════
+const STAFF_ROLES = ['admin', 'superadmin'];
+
+function isStaff() {
+    return !!currentUser && STAFF_ROLES.includes(currentUser.role);
+}
+
+function setupAdminAccess() {
+    const link = document.getElementById('nav-admin');
+    if (link) link.hidden = !isStaff();
+    if (!isStaff() && state.view === 'admin') showView('dashboard');
+}
+
+// Os ficheiros do painel só são pedidos a quem é ADMIN/SUPERADMIN (utilizadores comuns nunca os descarregam)
+let adminPanelPromise = null;
+function ensureAdminPanel() {
+    if (!isStaff()) return Promise.reject(new Error('forbidden'));
+    if (window.PainelAdm) return Promise.resolve(window.PainelAdm);
+    if (!adminPanelPromise) {
+        adminPanelPromise = new Promise((resolve, reject) => {
+            const css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = 'painel-adm.css?v=1';
+            document.head.appendChild(css);
+            const js = document.createElement('script');
+            js.src = 'painel-adm.js?v=1';
+            js.onload = () => resolve(window.PainelAdm);
+            js.onerror = () => { adminPanelPromise = null; reject(new Error('load')); };
+            document.head.appendChild(js);
+        });
+    }
+    return adminPanelPromise;
+}
+
+function showAdminPanel() {
+    ensureAdminPanel()
+        .then(panel => panel.onShown())
+        .catch(() => toast('Não foi possível carregar o painel administrativo.', 'error'));
+}
+
 function setupUser() {
     const initials = currentUser.username
         ? currentUser.username.slice(0, 2).toUpperCase()
@@ -89,6 +131,7 @@ function setupUser() {
     refreshAvatars();
     document.getElementById('user-name').textContent   = currentUser.username || currentUser.email;
     document.getElementById('user-email').textContent  = currentUser.email || '';
+    setupAdminAccess();
 }
 
 function setupColorPicker(activeColor = '#667eea') {
@@ -187,7 +230,8 @@ async function loadAll() {
 }
 
 function refreshActiveView() {
-    if (state.view === 'assistant') return Promise.resolve();   // a conversa não depende da lista de tarefas
+    // a conversa do assistente e o painel administrativo não dependem da lista de tarefas
+    if (state.view === 'assistant' || state.view === 'admin') return Promise.resolve();
     return state.view === 'tasks' ? loadTasks() : loadRecentTasks();
 }
 
@@ -874,22 +918,26 @@ function setFilter(filter) {
 // Alterna entre a vista do dashboard e a lista de tarefas.
 // `filter` indica qual item da navegação fica ativo na vista de lista.
 function showView(view, title, filter) {
-    const isDash      = view === 'dashboard';
-    const isAssistant = view === 'assistant';
-    state.view = isDash ? 'dashboard' : (isAssistant ? 'assistant' : 'tasks');
-    document.getElementById('dashboard-view').hidden = !isDash;
-    document.getElementById('tasks-view').hidden     = isDash || isAssistant;
-    document.getElementById('assistant-view').hidden = !isAssistant;
+    if (view === 'admin' && !isStaff()) view = 'dashboard';        // cosmético: o backend autoriza cada rota /admin
+    const ids = { dashboard: 'dashboard-view', tasks: 'tasks-view', assistant: 'assistant-view', admin: 'admin-view' };
+    const key = ids[view] ? view : 'tasks';
+    const isDash = key === 'dashboard', isAssistant = key === 'assistant', isAdmin = key === 'admin';
+    state.view = key;
+    Object.keys(ids).forEach(k => {
+        const el = document.getElementById(ids[k]);
+        if (el) el.hidden = k !== key;
+    });
     document.getElementById('page-title').textContent =
-        isDash ? 'Dashboard' : (isAssistant ? 'Assistente de IA' : (title || 'Tarefas'));
+        isDash ? 'Dashboard' : (isAssistant ? 'Assistente de IA' : (isAdmin ? 'Administração' : (title || 'Tarefas')));
 
     document.querySelectorAll('.nav-link').forEach(a => {
-        const active = (isDash || isAssistant) ? a.dataset.view === view : a.dataset.filter === filter;
+        const active = (isDash || isAssistant || isAdmin) ? a.dataset.view === key : a.dataset.filter === filter;
         a.classList.toggle('active', active);
     });
 
     if (isDash) loadDashboard();
     if (isAssistant) onAssistantShown();       // definido em assistant.js
+    if (isAdmin) showAdminPanel();             // painel-adm.js, carregado só para administradores
     if (window.innerWidth < 768 && document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
 }
 
@@ -1573,10 +1621,98 @@ function clearPendingAvatar() {
 
 function openProfileModal() {
     clearPendingAvatar();
-    document.getElementById('profile-name').textContent  = currentUser.username || '';
-    document.getElementById('profile-email').textContent = currentUser.email || '';
+    fillProfileForms();
     refreshAvatars();
     bootstrap.Modal.getOrCreateInstance(document.getElementById('profileModal')).show();
+}
+
+// ── Dados da conta e senha (qualquer utilizador; as senhas nunca são guardadas no navegador) ──
+function setFormMessage(id, text, type) {
+    const el = document.getElementById(id);
+    el.textContent = text || '';                         // texto puro
+    el.className = 'profile-msg' + (text ? ` is-${type || 'error'}` : '');
+}
+
+function fillProfileForms() {
+    document.getElementById('profile-name').textContent  = currentUser.username || '';
+    document.getElementById('profile-email').textContent = currentUser.email || '';
+    document.getElementById('profile-username').value    = currentUser.username || '';
+    document.getElementById('profile-email-input').value = currentUser.email || '';
+    ['profile-email-password', 'pw-current', 'pw-new', 'pw-confirm'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('profile-email-pw-wrap').hidden = true;
+    setFormMessage('profile-msg', '');
+    setFormMessage('password-msg', '');
+}
+
+// A senha atual só é pedida quando o email muda (é o identificador de login)
+function profileEmailChanged() {
+    return document.getElementById('profile-email-input').value.trim().toLowerCase() !== (currentUser.email || '').toLowerCase();
+}
+
+function onProfileEmailInput() {
+    document.getElementById('profile-email-pw-wrap').hidden = !profileEmailChanged();
+}
+
+// Corpo do PATCH /auth/me: só os campos alterados (null se não houver nada para enviar)
+function buildProfilePatch(current, username, email, password) {
+    const body = {};
+    const name = String(username).trim();
+    const mail = String(email).trim();
+    if (name !== (current.username || '')) body.username = name;
+    if (mail.toLowerCase() !== (current.email || '').toLowerCase()) {
+        body.email = mail;
+        body.current_password = password;
+    }
+    return Object.keys(body).length ? body : null;
+}
+
+async function saveProfile() {
+    const button = document.getElementById('profile-save');
+    const body = buildProfilePatch(currentUser,
+        document.getElementById('profile-username').value,
+        document.getElementById('profile-email-input').value,
+        document.getElementById('profile-email-password').value);
+    if (!body) { setFormMessage('profile-msg', 'Não há alterações para salvar.', 'info'); return; }
+    if (body.username === '') { setFormMessage('profile-msg', 'O nome de usuário não pode ficar vazio.'); return; }
+    if (body.email !== undefined && !body.current_password) {
+        setFormMessage('profile-msg', 'Indique a senha atual para mudar o email.'); return;
+    }
+    button.disabled = true;
+    const res = await apiRequest('/auth/me', { method: 'PATCH', body: JSON.stringify(body) });
+    button.disabled = false;
+    document.getElementById('profile-email-password').value = '';
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setFormMessage('profile-msg', data.message || 'Não foi possível salvar os dados.'); return; }
+    currentUser = data.user;
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    setupUser();
+    fillProfileForms();
+    setFormMessage('profile-msg', 'Dados atualizados.', 'success');
+}
+
+async function changePassword() {
+    const current = document.getElementById('pw-current').value;
+    const next    = document.getElementById('pw-new').value;
+    const confirm = document.getElementById('pw-confirm').value;
+    if (!current || !next) { setFormMessage('password-msg', 'Preencha a senha atual e a nova senha.'); return; }
+    if (next !== confirm) { setFormMessage('password-msg', 'A confirmação não coincide com a nova senha.'); return; }
+    const button = document.getElementById('password-save');
+    button.disabled = true;
+    const res = await apiRequest('/auth/password', {
+        method: 'PUT', body: JSON.stringify({ current_password: current, new_password: next }),
+    });
+    button.disabled = false;
+    ['pw-current', 'pw-new', 'pw-confirm'].forEach(id => { document.getElementById(id).value = ''; });
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setFormMessage('password-msg', data.message || 'Não foi possível alterar a senha.'); return; }
+    // Todas as sessões foram revogadas no servidor; esta continua com os tokens novos
+    accessToken  = data.tokens.access_token;
+    refreshToken = data.tokens.refresh_token;
+    localStorage.setItem('access_token',  accessToken);
+    localStorage.setItem('refresh_token', refreshToken);
+    setFormMessage('password-msg', 'Senha alterada. As outras sessões foram encerradas.', 'success');
 }
 
 // Recorta no centro e reduz para AVATAR_SIZE x AVATAR_SIZE (JPEG): envio leve e dentro do limite do servidor

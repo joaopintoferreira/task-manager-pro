@@ -30,6 +30,10 @@ class Config:
     AI_TIMEOUT_SECONDS = os.getenv('AI_TIMEOUT_SECONDS') or '20'
     AI_MAX_TOKENS      = os.getenv('AI_MAX_TOKENS') or '600'
 
+    # ── Painel administrativo ──
+    # Interruptor da limpeza global de dados: DESLIGADO por omissão. Só o backend o lê; sem `true` a rota recusa.
+    ADMIN_ALLOW_GLOBAL_WIPE = (os.getenv('ADMIN_ALLOW_GLOBAL_WIPE') or '').strip().lower() in ('1', 'true', 'yes')
+
     DEBUG = False
     TESTING = False
 

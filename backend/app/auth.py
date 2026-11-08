@@ -259,6 +259,111 @@ def me(current_user):
 
 
 # ──────────────────────────────────────────────
+# Perfil (qualquer utilizador): nome, email e senha
+# Só aceita campos de uma lista fixa: papel, estado e outros campos administrativos NUNCA são alteráveis aqui.
+# ──────────────────────────────────────────────
+PROFILE_FIELDS = {'username', 'email', 'current_password'}
+PASSWORD_FIELDS = {'current_password', 'new_password'}
+
+
+def _confirm_own_password(user, password):
+    """Valida a senha atual (com limite de tentativas por utilizador). Devolve uma resposta de erro ou None."""
+    from backend.app.services.permissions import AdminError, verify_actor_password   # import tardio: evita ciclo
+    try:
+        verify_actor_password(user, password)
+    except AdminError as exc:
+        return exc.response()
+    return None
+
+
+@auth_bp.route('/me', methods=['PATCH'])
+@limiter.limit("30 per hour")
+@token_required
+def update_me(current_user):
+    """Altera nome de exibição e/ou email. Mudar o email exige a senha atual (é o identificador de login)."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data:
+        return jsonify({'message': 'Corpo da requisição inválido.', 'code': 'invalid_request'}), 400
+    extra = sorted(set(data) - PROFILE_FIELDS)
+    if extra:
+        return jsonify({'message': 'Campos não permitidos neste pedido.', 'code': 'invalid_fields'}), 400
+
+    username = current_user.username
+    if 'username' in data:
+        value = data['username']
+        if not isinstance(value, str) or not value.strip():
+            return jsonify({'message': 'O nome de usuário não pode ficar vazio.', 'code': 'invalid_username'}), 400
+        username = value.strip()
+        if len(username) > 80:
+            return jsonify({'message': 'Nome de usuário deve ter no máximo 80 caracteres!', 'code': 'invalid_username'}), 400
+
+    email = current_user.email
+    if 'email' in data:
+        value = data['email']
+        if not isinstance(value, str):
+            return jsonify({'message': 'Formato de email inválido!', 'code': 'invalid_email'}), 400
+        email = value.strip().lower()
+        if not validate_email(email) or len(email) > 120:
+            return jsonify({'message': 'Formato de email inválido!', 'code': 'invalid_email'}), 400
+
+    if username != current_user.username:
+        if User.query.filter(User.username == username, User.id != current_user.id).first():
+            return jsonify({'message': 'Nome de usuário já existe!', 'code': 'username_taken'}), 409
+    if email != current_user.email:
+        if User.query.filter(User.email == email, User.id != current_user.id).first():
+            return jsonify({'message': 'Email já cadastrado!', 'code': 'email_taken'}), 409
+        error = _confirm_own_password(current_user, data.get('current_password'))
+        if error:
+            return error
+
+    if username == current_user.username and email == current_user.email:
+        return jsonify({'message': 'Nada para alterar.', 'user': current_user.to_dict()})
+
+    current_user.username, current_user.email = username, email
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'message': 'Email ou nome de usuário já cadastrado!', 'code': 'conflict'}), 409
+
+    logger.info(f"Perfil atualizado: user {current_user.id}")
+    return jsonify({'message': 'Perfil atualizado!', 'user': current_user.to_dict()})
+
+
+@auth_bp.route('/password', methods=['PUT'])
+@limiter.limit("10 per hour")
+@token_required
+def change_password(current_user):
+    """Altera a senha: exige a senha atual, aplica a política e revoga TODOS os refresh tokens do utilizador.
+
+    Devolve tokens novos para a sessão atual não terminar. Limitação conhecida: os JWT de ACESSO já emitidos
+    (outros dispositivos) continuam válidos até expirarem (15 min por omissão), porque o token não leva versão.
+    """
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data or set(data) - PASSWORD_FIELDS:
+        return jsonify({'message': 'Corpo da requisição inválido.', 'code': 'invalid_request'}), 400
+    new_password = data.get('new_password')
+    if not isinstance(new_password, str) or not new_password:
+        return jsonify({'message': 'Indique a nova senha.', 'code': 'invalid_password'}), 400
+
+    error = _confirm_own_password(current_user, data.get('current_password'))
+    if error:
+        return error
+    is_valid, msg = validate_password(new_password)
+    if not is_valid:
+        return jsonify({'message': msg, 'code': 'weak_password'}), 400
+    if current_user.check_password(new_password):
+        return jsonify({'message': 'A nova senha deve ser diferente da atual.', 'code': 'same_password'}), 400
+
+    current_user.set_password(new_password)
+    RefreshToken.query.filter_by(user_id=current_user.id).delete()      # revoga todas as sessões
+    tokens = generate_tokens(current_user.id)                            # mesmo commit: senha + revogação + token novo
+
+    logger.info(f"Senha alterada: user {current_user.id}")
+    return jsonify({'message': 'Senha alterada! As outras sessões foram encerradas.', 'tokens': tokens})
+
+
+# ──────────────────────────────────────────────
 # Foto de perfil
 # O usuário é sempre o do token: não há parâmetro de id, então ninguém
 # consegue ler ou alterar a foto de outra pessoa.

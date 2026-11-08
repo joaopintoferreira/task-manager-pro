@@ -317,6 +317,16 @@ button { cursor: pointer; font-family: inherit; }
 }
 .btn-logout:hover { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
 
+.nav-link[hidden] { display: none !important; }
+
+/* Perfil: secções e mensagens */
+.profile-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.profile-section-title { font-size: .86rem; font-weight: 650; margin: 0 0 10px; }
+.profile-msg { min-height: 1.2em; margin-bottom: 8px; font-size: .84rem; color: var(--text-muted); }
+.profile-msg.is-error   { color: var(--danger); }
+.profile-msg.is-success { color: var(--success); }
+.profile-msg.is-info    { color: var(--text-muted); }
+
 /* "Sair" dentro do modal de perfil */
 .profile-logout {
     margin-top: 16px;

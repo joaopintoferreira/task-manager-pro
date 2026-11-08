@@ -28,6 +28,12 @@ class User(db.Model):
     created_at   = db.Column(db.DateTime, default=datetime.utcnow)
     last_login   = db.Column(db.DateTime)
     is_active    = db.Column(db.Boolean, default=True)
+    # Papel administrativo: user (omissão) | admin | superadmin. Lido da base a cada pedido (nunca do JWT).
+    role         = db.Column(db.String(20), nullable=False, default='user', server_default='user')
+
+    __table_args__ = (
+        db.CheckConstraint("role IN ('user', 'admin', 'superadmin')", name='ck_users_role'),
+    )
 
     tasks          = db.relationship('Task',             backref='owner',   lazy='dynamic', foreign_keys='Task.user_id')
     categories     = db.relationship('Category',         backref='user',    lazy='dynamic')
@@ -50,6 +56,7 @@ class User(db.Model):
             'email':      self.email,
             'created_at': iso_utc(self.created_at),
             'is_active':  self.is_active,
+            'role':       self.role,
             'has_avatar': avatar_updated_at is not None,
             'avatar_updated_at': iso_utc(avatar_updated_at),
         }
@@ -198,4 +205,39 @@ class Notification(db.Model):
             'is_read':    self.is_read,
             'created_at': iso_utc(self.created_at),
             'task_id':    self.task_id,
+        }
+
+
+class AdminAuditLog(db.Model):
+    """Registo de auditoria das operações administrativas (só acrescenta; nenhuma rota o altera ou apaga).
+
+    `actor_id` e `target_id` são inteiros SEM chave estrangeira de propósito: o histórico tem de sobreviver
+    à exclusão do administrador ou do utilizador afetado. `details` guarda apenas metadados e contagens
+    (nunca senhas, tokens, hashes nem conteúdo de tarefas).
+    """
+    __tablename__ = 'admin_audit_log'
+
+    id           = db.Column(db.Integer, primary_key=True)
+    created_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    actor_id     = db.Column(db.Integer, index=True)
+    actor_label  = db.Column(db.String(120))
+    action       = db.Column(db.String(60), nullable=False, index=True)
+    target_type  = db.Column(db.String(30))
+    target_id    = db.Column(db.Integer)
+    target_label = db.Column(db.String(120))
+    result       = db.Column(db.String(10), nullable=False)    # success | denied | failed
+    details      = db.Column(db.JSON)
+
+    def to_dict(self):
+        return {
+            'id':           self.id,
+            'created_at':   iso_utc(self.created_at),
+            'actor_id':     self.actor_id,
+            'actor_label':  self.actor_label,
+            'action':       self.action,
+            'target_type':  self.target_type,
+            'target_id':    self.target_id,
+            'target_label': self.target_label,
+            'result':       self.result,
+            'details':      self.details or {},
         }
